@@ -1,0 +1,1054 @@
+.admin-warehouses-page {
+  min-height: calc(100vh - 62px);
+  color: #101828;
+}
+
+.admin-warehouses-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.admin-warehouses-heading > div:first-child > span {
+  color: #f45b0b;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.admin-warehouses-heading h1 {
+  margin: 5px 0 3px;
+  font-size: 29px;
+  letter-spacing: -0.045em;
+}
+
+.admin-warehouses-heading p {
+  margin: 0;
+  color: #667085;
+  font-size: 10px;
+}
+
+.warehouse-heading-actions {
+  display: flex;
+  gap: 7px;
+}
+
+.warehouse-heading-actions button,
+.transfer-heading button,
+.warehouse-network-title button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #344054;
+  font-size: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.warehouse-heading-actions button:last-child,
+.transfer-heading button {
+  border-color: #f45b0b;
+  background: #f45b0b;
+  color: #fff;
+}
+
+.warehouse-network-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+.warehouse-network-kpis > div {
+  padding: 14px 15px;
+  border-right: 1px solid #eee;
+}
+
+.warehouse-network-kpis > div:last-child {
+  border-right: 0;
+}
+
+.warehouse-network-kpis span,
+.warehouse-network-kpis strong,
+.warehouse-network-kpis small {
+  display: block;
+}
+
+.warehouse-network-kpis span {
+  color: #98a2b3;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.warehouse-network-kpis strong {
+  margin-top: 5px;
+  font-size: 20px;
+}
+
+.warehouse-network-kpis strong.green {
+  color: #087443;
+}
+
+.warehouse-network-kpis strong.orange {
+  color: #f45b0b;
+}
+
+.warehouse-network-kpis small {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.warehouse-network,
+.allocation-section,
+.transfer-section {
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+.warehouse-network-title,
+.allocation-heading,
+.transfer-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 12px;
+}
+
+.warehouse-network-title > div > span,
+.allocation-heading > div > span,
+.transfer-heading > div > span {
+  color: #98a2b3;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.warehouse-network-title h2,
+.allocation-heading h2,
+.transfer-heading h2 {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.warehouse-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.warehouse-operation-card {
+  padding: 13px;
+  border: 1px solid #e3e5e8;
+  background: #fafaf8;
+  transition: border-color 0.2s ease;
+}
+
+.warehouse-operation-card:hover {
+  border-color: #f45b0b;
+}
+
+.warehouse-operation-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.warehouse-operation-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  background: #fff;
+  color: #f45b0b;
+}
+
+.warehouse-operational {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #087443;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.warehouse-operational i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #12b76a;
+}
+
+.warehouse-operation-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.warehouse-operation-name h3 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.warehouse-operation-name span {
+  display: block;
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.warehouse-operation-name button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #667085;
+  cursor: pointer;
+}
+
+.warehouse-capacity-wrap {
+  margin-top: 15px;
+}
+
+.warehouse-capacity-line {
+  display: flex;
+  justify-content: space-between;
+}
+
+.warehouse-capacity-line span {
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.warehouse-capacity-line strong {
+  font-size: 7px;
+}
+
+.warehouse-capacity-track {
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  background: #e4e7ec;
+}
+
+.warehouse-capacity-track span {
+  display: block;
+  height: 100%;
+}
+
+.warehouse-capacity-track span.healthy {
+  background: #12b76a;
+}
+
+.warehouse-capacity-track span.warning {
+  background: #f79009;
+}
+
+.warehouse-capacity-track span.danger {
+  background: #d92d20;
+}
+
+.warehouse-operation-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 14px;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.warehouse-operation-metrics div {
+  padding: 9px 5px;
+  border-right: 1px solid #e5e7eb;
+}
+
+.warehouse-operation-metrics div:last-child {
+  border-right: 0;
+}
+
+.warehouse-operation-metrics span,
+.warehouse-operation-metrics strong {
+  display: block;
+}
+
+.warehouse-operation-metrics span {
+  color: #98a2b3;
+  font-size: 6px;
+}
+
+.warehouse-operation-metrics strong {
+  margin-top: 3px;
+  font-size: 9px;
+}
+
+.warehouse-operation-card footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 9px;
+  color: #667085;
+  font-size: 7px;
+}
+
+.warehouse-operation-card footer strong {
+  color: #101828;
+}
+
+.allocation-heading p {
+  margin: 4px 0 0;
+  color: #98a2b3;
+  font-size: 8px;
+}
+
+.allocation-heading button {
+  border: 0;
+  background: transparent;
+  color: #f45b0b;
+  font-size: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.allocation-table-wrapper,
+.transfer-table-wrapper {
+  overflow-x: auto;
+}
+
+.allocation-table,
+.transfer-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+}
+
+.allocation-table th,
+.transfer-table th {
+  padding: 9px 11px;
+  border-bottom: 1px solid #eee;
+  background: #fafaf8;
+  color: #98a2b3;
+  text-align: left;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.allocation-table td,
+.transfer-table td {
+  padding: 10px 11px;
+  border-bottom: 1px solid #eee;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.allocation-table tbody tr:hover,
+.transfer-table tbody tr:hover {
+  background: #fffaf7;
+}
+
+.allocation-table td strong,
+.allocation-table td span {
+  display: block;
+}
+
+.allocation-table td strong {
+  font-size: 8px;
+}
+
+.allocation-table td span {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.region-badge {
+  display: inline-block !important;
+  padding: 4px 6px;
+  background: #f2f4f7;
+  color: #667085 !important;
+}
+
+.allocation-warehouse {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.allocation-warehouse svg {
+  color: #f45b0b;
+}
+
+.allocation-rule {
+  display: inline-block !important;
+  padding: 4px 6px;
+  background: #ecfdf3;
+  color: #087443 !important;
+}
+
+.sla-value {
+  color: #087443 !important;
+  font-weight: 800;
+}
+
+.transfer-heading {
+  align-items: center;
+}
+
+.transfer-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.transfer-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid #ddd;
+  color: #98a2b3;
+}
+
+.transfer-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 8px;
+}
+
+.transfer-toolbar label {
+  display: block;
+}
+
+.transfer-toolbar label > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.transfer-toolbar label > div {
+  position: relative;
+}
+
+.transfer-toolbar select {
+  min-width: 130px;
+  appearance: none;
+  padding: 9px 25px 9px 9px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 8px;
+  outline: 0;
+}
+
+.transfer-toolbar label svg {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  pointer-events: none;
+  transform: translateY(-50%);
+  color: #667085;
+}
+
+.transfer-table td > strong,
+.transfer-table td > span {
+  display: block;
+}
+
+.transfer-table td > span {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.transfer-product {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transfer-product > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 33px;
+  height: 35px;
+  background: #f2f4f7;
+  color: #98a2b3;
+}
+
+.transfer-product section strong,
+.transfer-product section span {
+  display: block;
+}
+
+.transfer-product section strong {
+  color: #101828;
+  font-size: 8px;
+}
+
+.transfer-product section span {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.transfer-route {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transfer-route svg {
+  color: #f45b0b;
+}
+
+.transfer-route span {
+  margin: 0 !important;
+  color: #344054 !important;
+}
+
+.transfer-reason {
+  display: inline-block !important;
+  padding: 4px 6px;
+  background: #f2f4f7;
+  color: #667085 !important;
+}
+
+.transfer-status {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 5px 7px;
+  font-weight: 800;
+}
+
+.transfer-status i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.transfer-status.pending-pickup {
+  background: #fff8eb;
+  color: #b54708 !important;
+}
+
+.transfer-status.pending-pickup i {
+  background: #f79009;
+}
+
+.transfer-status.in-transit {
+  background: #eff8ff;
+  color: #175cd3 !important;
+}
+
+.transfer-status.in-transit i {
+  background: #2e90fa;
+}
+
+.transfer-status.delivered {
+  background: #ecfdf3;
+  color: #087443 !important;
+}
+
+.transfer-status.delivered i {
+  background: #12b76a;
+}
+
+.transfer-status.cancelled {
+  background: #fff1f0;
+  color: #b42318 !important;
+}
+
+.transfer-status.cancelled i {
+  background: #d92d20;
+}
+
+.transfer-eta {
+  color: #344054 !important;
+}
+
+.transfer-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 11px 0;
+  color: #667085;
+  font-size: 8px;
+}
+
+.transfer-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transfer-pagination label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.transfer-pagination select {
+  padding: 5px;
+  border: 1px solid #ddd;
+  font-size: 8px;
+}
+
+.transfer-pagination button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  border: 1px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+}
+
+.transfer-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.warehouse-drawer-backdrop {
+  position: fixed;
+  z-index: 199;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.42);
+}
+
+.warehouse-details-drawer,
+.warehouse-transfer-drawer {
+  position: fixed;
+  z-index: 200;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(460px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: #f7f7f4;
+  box-shadow: -15px 0 40px rgba(0, 0, 0, 0.14);
+}
+
+.warehouse-details-drawer > header,
+.warehouse-transfer-drawer > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #ddd;
+  background: #fff;
+}
+
+.warehouse-details-drawer > header span,
+.warehouse-transfer-drawer > header span {
+  color: #f45b0b;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+}
+
+.warehouse-details-drawer > header h2,
+.warehouse-transfer-drawer > header h2 {
+  margin: 5px 0 3px;
+  font-size: 17px;
+}
+
+.warehouse-details-drawer > header small,
+.warehouse-transfer-drawer > header small {
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.warehouse-details-drawer > header button,
+.warehouse-transfer-drawer > header button {
+  display: flex;
+  padding: 7px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #667085;
+  cursor: pointer;
+}
+
+.warehouse-details-body,
+.warehouse-transfer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.warehouse-detail-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 6px 8px;
+  background: #ecfdf3;
+  color: #087443;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.warehouse-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  margin-top: 10px;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+.warehouse-detail-grid div {
+  padding: 12px;
+  border-right: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+
+.warehouse-detail-grid div:nth-child(2n) {
+  border-right: 0;
+}
+
+.warehouse-detail-grid div:nth-child(n + 3) {
+  border-bottom: 0;
+}
+
+.warehouse-detail-grid span,
+.warehouse-detail-grid strong {
+  display: block;
+}
+
+.warehouse-detail-grid span {
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.warehouse-detail-grid strong {
+  margin-top: 5px;
+  font-size: 15px;
+}
+
+.warehouse-detail-section {
+  margin-top: 10px;
+  padding: 13px;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+.warehouse-detail-section h3 {
+  margin: 0 0 10px;
+  font-size: 9px;
+}
+
+.warehouse-detail-section p {
+  margin: 7px 0 0;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.warehouse-manager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.warehouse-manager strong,
+.warehouse-manager span {
+  display: block;
+}
+
+.warehouse-manager strong {
+  font-size: 9px;
+}
+
+.warehouse-manager span {
+  margin-top: 3px;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.warehouse-manager svg {
+  color: #667085;
+}
+
+.warehouse-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #667085;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.warehouse-address svg {
+  flex-shrink: 0;
+  color: #f45b0b;
+}
+
+.warehouse-carrier-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.warehouse-carrier-list span {
+  padding: 5px 7px;
+  background: #f2f4f7;
+  color: #667085;
+  font-size: 7px;
+}
+
+.warehouse-performance {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.warehouse-performance div {
+  padding: 9px;
+  background: #fafaf8;
+}
+
+.warehouse-performance span,
+.warehouse-performance strong {
+  display: block;
+}
+
+.warehouse-performance span {
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.warehouse-performance strong {
+  margin-top: 4px;
+  color: #087443;
+  font-size: 10px;
+}
+
+.warehouse-details-drawer > footer,
+.warehouse-transfer-drawer > footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  padding: 12px 15px;
+  border-top: 1px solid #ddd;
+  background: #fff;
+}
+
+.warehouse-details-drawer > footer button,
+.warehouse-transfer-drawer > footer button {
+  padding: 10px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #344054;
+  font-size: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.warehouse-details-drawer > footer button:last-child,
+.warehouse-transfer-drawer > footer button:last-child {
+  border-color: #f45b0b;
+  background: #f45b0b;
+  color: #fff;
+}
+
+.warehouse-transfer-body > label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.warehouse-transfer-body > label > span,
+.warehouse-transfer-route label > span {
+  display: block;
+  margin-bottom: 5px;
+  color: #667085;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.warehouse-transfer-body input,
+.warehouse-transfer-body select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #ddd;
+  outline: 0;
+  background: #fff;
+  color: #344054;
+  font-size: 8px;
+}
+
+.warehouse-transfer-body input:focus,
+.warehouse-transfer-body select:focus {
+  border-color: #f45b0b;
+}
+
+.warehouse-transfer-route {
+  display: grid;
+  grid-template-columns: 1fr 20px 1fr;
+  align-items: end;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.warehouse-transfer-route > svg {
+  margin-bottom: 10px;
+  color: #f45b0b;
+}
+
+.transfer-preview {
+  margin-top: 15px;
+  padding: 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+.transfer-preview > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #344054;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.transfer-preview > div svg {
+  color: #f45b0b;
+}
+
+.transfer-preview p {
+  margin: 10px 0 5px;
+  color: #667085;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.transfer-preview p strong {
+  color: #101828;
+}
+
+.transfer-preview small {
+  color: #98a2b3;
+  font-size: 7px;
+  line-height: 1.4;
+}
+
+.warehouse-transfer-drawer > footer button:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+@media (max-width: 1100px) {
+  .warehouse-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .warehouse-network-kpis {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .warehouse-network-kpis > div:nth-child(3) {
+    border-right: 0;
+  }
+
+  .warehouse-network-kpis > div:nth-child(n + 4) {
+    border-top: 1px solid #eee;
+  }
+}
+
+@media (max-width: 800px) {
+  .admin-warehouses-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .warehouse-heading-actions {
+    width: 100%;
+  }
+
+  .warehouse-heading-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .warehouse-network-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .warehouse-network-kpis > div:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .warehouse-network-kpis > div:nth-child(n + 3) {
+    border-top: 1px solid #eee;
+  }
+
+  .transfer-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .transfer-toolbar label {
+    width: 100%;
+  }
+
+  .transfer-toolbar select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .warehouse-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .warehouse-network-kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .warehouse-heading-actions {
+    flex-direction: column;
+  }
+
+  .warehouse-network-title,
+  .allocation-heading,
+  .transfer-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .warehouse-network-title button,
+  .allocation-heading button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .warehouse-transfer-route {
+    grid-template-columns: 1fr;
+  }
+
+  .warehouse-transfer-route > svg {
+    display: none;
+  }
+}
