@@ -1,1022 +1,498 @@
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertTriangle,
   ArrowLeft,
+  Banknote,
   Check,
-  ChevronRight,
+  CheckCircle2,
   CreditCard,
+  Landmark,
+  Lock,
   MapPin,
   Package,
+  Pencil,
+  Plus,
+  RefreshCcw,
   ShieldCheck,
   Smartphone,
+  Star,
   Truck,
   Wallet,
+  Warehouse,
+  XCircle,
+  Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
 import { useShop } from "../../context/ShopContext";
+import { saveAddress, useCurrentUser } from "../../lib/services/account";
+import { planFulfilment } from "../../lib/delivery";
+import { computeSummary } from "../../lib/pricing";
+import { PAYMENT_METHODS, paymentMode } from "../../lib/services/payments";
+import { collectPayment, placeOrder } from "../../lib/services/orders";
+import { cx, dayLabel, formatINR } from "../../lib/format";
+import { randomId } from "../../lib/crypto";
+import { toast } from "../../lib/toast";
+import AddressForm from "../account/AddressForm";
+import CouponPanel, { PriceDetails } from "../cart/CouponPanel";
+import { Empty, Img, Modal, useDocumentTitle } from "../common/ui";
 import "./CheckoutPage.css";
 
-const FREE_SHIPPING_LIMIT = 999;
+const METHOD_ICONS = { upi: Smartphone, card: CreditCard, netbanking: Landmark, wallet: Wallet, cod: Banknote };
 
-const money = (value) =>
-  Number(value || 0).toLocaleString("en-IN");
-
-const initialAddress = {
-  fullName: "",
-  phone: "",
-  email: "",
-  addressLine: "",
-  city: "",
-  state: "",
-  pincode: "",
-  landmark: "",
-  type: "Home",
-};
-
-const PAYMENT_OPTIONS = [
-  {
-    id: "upi",
-    title: "UPI",
-    description: "Google Pay, PhonePe, Paytm and more",
-    icon: Smartphone,
-  },
-  {
-    id: "card",
-    title: "Credit / Debit Card",
-    description: "Visa, Mastercard, RuPay and more",
-    icon: CreditCard,
-  },
-  {
-    id: "netbanking",
-    title: "Net Banking",
-    description: "All major Indian banks",
-    icon: Wallet,
-  },
-  {
-    id: "cod",
-    title: "Cash on Delivery",
-    description: "Pay when your order arrives",
-    icon: Package,
-  },
+const STAGES = [
+  { key: "validating", label: "Validating bag & prices" },
+  { key: "reserving", label: "Reserving stock at warehouse" },
+  { key: "creating_payment", label: "Creating secure payment order" },
+  { key: "awaiting_payment", label: "Waiting for payment" },
+  { key: "verifying", label: "Verifying payment signature" },
+  { key: "confirming", label: "Confirming order & creating shipments" },
 ];
 
-export default function CheckoutPage({
-  checkoutData,
-  onBack,
-  onPlaceOrder,
-  onAddressSaved,
-}) {
-  const {
-    cart,
-    cartCount,
-    cartSubtotal,
-    cartMrpTotal,
-    productSavings,
-  } = useShop();
-
-  const [address, setAddress] =
-    useState(initialAddress);
-
-  const [savedAddress, setSavedAddress] =
-    useState(null);
-
-  const [paymentMethod, setPaymentMethod] =
-    useState("upi");
-
-  const [coupon, setCoupon] = useState("");
-
-  const [appliedCoupon, setAppliedCoupon] =
-    useState(null);
-
-  const [couponMessage, setCouponMessage] =
-    useState("");
-
-  const [checkingDelivery, setCheckingDelivery] =
-    useState(false);
-
-  const [deliveryChecked, setDeliveryChecked] =
-    useState(false);
-
-  const [placingOrder, setPlacingOrder] =
-    useState(false);
-
-  const [errors, setErrors] = useState({});
-
-  const shipping = useMemo(() => {
-    if (cartSubtotal === 0) return 0;
-
-    return cartSubtotal >= FREE_SHIPPING_LIMIT
-      ? 0
-      : 49;
-  }, [cartSubtotal]);
-
-  const couponDiscount = useMemo(() => {
-    if (!appliedCoupon) return 0;
-
-    return Math.min(
-      Math.round(
-        cartSubtotal * appliedCoupon.percent
-      ) / 100,
-      appliedCoupon.maxDiscount
-    );
-  }, [cartSubtotal, appliedCoupon]);
-
-  const grandTotal = Math.max(
-    cartSubtotal +
-      shipping -
-      couponDiscount,
-    0
+function Steps({ step }) {
+  const steps = ["Bag", "Address", "Delivery", "Payment"];
+  return (
+    <div className="stepper">
+      {steps.map((s, i) => (
+        <span key={s} className="row gap-6" style={{ flex: i < steps.length - 1 ? 1 : "none" }}>
+          <span className={cx("step", i < step && "done", i === step && "active")}>
+            <span className="num">{i < step ? <Check size={13} /> : i + 1}</span> {s}
+          </span>
+          {i < steps.length - 1 ? <span className={cx("bar", i < step && "done")} /> : null}
+        </span>
+      ))}
+    </div>
   );
+}
 
-  const updateAddress = (field, value) => {
-    setAddress((current) => ({
-      ...current,
-      [field]: value,
-    }));
+export default function CheckoutPage() {
+  useDocumentTitle("Checkout");
+  const navigate = useNavigate();
+  const user = useCurrentUser();
+  const { cart, inventory, appliedCoupon, userOrders, usage, setPincode } = useShop();
+  const [step, setStep] = useState(1);
+  const [addressId, setAddressId] = useState(() => user?.addresses?.find((a) => a.isDefault)?.id || user?.addresses?.[0]?.id);
+  const [editing, setEditing] = useState(null);
+  const [speed, setSpeed] = useState("standard");
+  const [courierChoice, setCourierChoice] = useState({});
+  const [method, setMethod] = useState("upi");
+  const [stage, setStage] = useState(null);
+  const [failure, setFailure] = useState(null);
+  const idem = useRef(`idem_${randomId(16)}`);
+  const [busy, setBusy] = useState(false);
 
-    setErrors((current) => ({
-      ...current,
-      [field]: "",
-    }));
+  const lines = useMemo(() => cart.filter((i) => !i.outOfStock).map((i) => ({ ...i, qty: Math.min(i.qty, i.stock) })), [cart]);
+  const address = user?.addresses?.find((a) => a.id === addressId);
+  const plan = useMemo(
+    () => (address ? planFulfilment(address.pincode, lines.map((l) => ({ productId: l.productId, qty: l.qty, weightKg: l.weightKg })), inventory) : null),
+    [address, lines, inventory]
+  );
+  const summary = useMemo(
+    () => computeSummary({ items: lines, couponCode: appliedCoupon, userOrders, usage, paymentMethod: method, deliverySpeed: plan?.expressAvailable ? speed : "standard" }),
+    [lines, appliedCoupon, userOrders, usage, method, speed, plan]
+  );
+  const codDisabledReason = !plan?.codAvailable ? "COD isn't available for this pincode" : !summary.codAvailable ? "COD available on orders up to ₹20,000" : lines.some((l) => !l.product.cod) ? "Some items aren't eligible for COD" : null;
 
-    if (field === "pincode") {
-      setDeliveryChecked(false);
-    }
-  };
+  useEffect(() => {
+    if (address) setPincode(address.pincode, { city: address.city, state: address.state });
+  }, [address, setPincode]);
 
-  const validateAddress = () => {
-    const nextErrors = {};
+  useEffect(() => {
+    if (method === "cod" && codDisabledReason) setMethod("upi");
+  }, [method, codDisabledReason]);
 
-    if (!address.fullName.trim()) {
-      nextErrors.fullName =
-        "Enter your full name";
-    }
-
-    if (!/^[6-9]\d{9}$/.test(address.phone)) {
-      nextErrors.phone =
-        "Enter a valid 10-digit mobile number";
-    }
-
-    if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        address.email
-      )
-    ) {
-      nextErrors.email =
-        "Enter a valid email address";
-    }
-
-    if (!address.addressLine.trim()) {
-      nextErrors.addressLine =
-        "Enter your address";
-    }
-
-    if (!address.city.trim()) {
-      nextErrors.city = "Enter your city";
-    }
-
-    if (!address.state.trim()) {
-      nextErrors.state = "Enter your state";
-    }
-
-    if (!/^\d{6}$/.test(address.pincode)) {
-      nextErrors.pincode =
-        "Enter a valid 6-digit pincode";
-    }
-
-    setErrors(nextErrors);
-
-    return Object.keys(nextErrors).length === 0;
-  };
-
-  const checkDelivery = async () => {
-    if (!/^\d{6}$/.test(address.pincode)) {
-      setErrors((current) => ({
-        ...current,
-        pincode:
-          "Enter a valid 6-digit pincode",
-      }));
-
-      return;
-    }
-
-    setCheckingDelivery(true);
-
-    await new Promise((resolve) =>
-      setTimeout(resolve, 900)
-    );
-
-    setCheckingDelivery(false);
-    setDeliveryChecked(true);
-  };
-
-  const applyCoupon = () => {
-    const code = coupon.trim().toUpperCase();
-
-    if (!code) {
-      setCouponMessage(
-        "Enter a coupon code"
-      );
-      return;
-    }
-
-    const coupons = {
-      D2C10: {
-        code: "D2C10",
-        percent: 10,
-        maxDiscount: 250,
-      },
-      FIRST15: {
-        code: "FIRST15",
-        percent: 15,
-        maxDiscount: 500,
-      },
-    };
-
-    const selected = coupons[code];
-
-    if (!selected) {
-      setAppliedCoupon(null);
-      setCouponMessage(
-        "This coupon is not available"
-      );
-      return;
-    }
-
-    if (cartSubtotal < 499) {
-      setAppliedCoupon(null);
-      setCouponMessage(
-        "Add products worth ₹499 to use this coupon"
-      );
-      return;
-    }
-
-    setAppliedCoupon(selected);
-    setCouponMessage(
-      `${selected.code} applied successfully`
-    );
-  };
-
-  const saveAddress = () => {
-    if (!validateAddress()) return;
-
-    setSavedAddress(address);
-    onAddressSaved?.(address);
-  };
-
-  const handlePlaceOrder = async () => {
-    if (!savedAddress) {
-      const valid = validateAddress();
-
-      if (!valid) return;
-
-      setSavedAddress(address);
-      onAddressSaved?.(address);
-    }
-
-    if (!deliveryChecked) {
-      await checkDelivery();
-      return;
-    }
-
-    setPlacingOrder(true);
-
-    const orderPayload = {
-      items: cart,
-      customer: savedAddress || address,
-      paymentMethod,
-      coupon: appliedCoupon,
-      pricing: {
-        mrp: cartMrpTotal,
-        productSavings,
-        shipping,
-        couponDiscount,
-        total: grandTotal,
-      },
-    };
-
-    await new Promise((resolve) =>
-      setTimeout(resolve, 700)
-    );
-
-    onPlaceOrder?.(orderPayload);
-
-    setPlacingOrder(false);
-  };
-
-  if (cart.length === 0) {
+  if (!lines.length && !stage) {
     return (
-      <main className="checkout-page checkout-empty">
-        <div className="checkout-empty-icon">
-          <Package size={34} />
-        </div>
-
-        <span>CHECKOUT</span>
-
-        <h1>Your cart is empty</h1>
-
-        <p>
-          Add products to your cart before
-          continuing to checkout.
-        </p>
-
-        <button
-          type="button"
-          onClick={onBack}
-        >
-          Continue shopping
-          <ChevronRight size={16} />
-        </button>
-      </main>
+      <div className="page container">
+        <Empty icon={<Package size={34} />} title="Your bag is empty" text="Add products to your bag before checking out." action={<Link to="/shop" className="btn">Continue shopping</Link>} />
+      </div>
     );
   }
 
+  const submitAddress = (a) => {
+    const id = saveAddress(user.id, { ...a, id: editing === "new" ? undefined : editing });
+    setAddressId(id);
+    setEditing(null);
+    toast("Address saved");
+  };
+
+  const pay = async () => {
+    if (busy) return;
+    setBusy(true);
+    setFailure(null);
+    setStage("validating");
+    const res = await placeOrder({
+      user,
+      lines,
+      address,
+      courierChoice,
+      deliverySpeed: plan?.expressAvailable ? speed : "standard",
+      paymentMethod: method,
+      couponCode: summary.couponCode,
+      idempotencyKey: idem.current,
+      onStage: setStage,
+    });
+    setBusy(false);
+    if (res.ok) {
+      setStage("done");
+      setTimeout(() => navigate(`/order-success/${res.order.id}`, { replace: true }), 700);
+    } else {
+      setStage(null);
+      setFailure(res);
+      // new idempotency key for a fresh attempt; retries reuse the failed order via collectPayment
+      idem.current = `idem_${randomId(16)}`;
+    }
+  };
+
+  const retry = async (newMethod) => {
+    if (!failure?.orderId) return pay();
+    setBusy(true);
+    const m = newMethod || method;
+    setStage("creating_payment");
+    const res = await collectPayment(failure.orderId, { user, address, paymentMethod: m, onStage: setStage });
+    setBusy(false);
+    if (res.ok) {
+      setStage("done");
+      setTimeout(() => navigate(`/order-success/${res.order.id}`, { replace: true }), 700);
+    } else {
+      setStage(null);
+      setFailure({ ...res, orderId: failure.orderId });
+    }
+  };
+
+  const mode = paymentMode();
+
   return (
-    <main className="checkout-page">
-      <header className="checkout-topbar">
-        <button
-          type="button"
-          onClick={onBack}
-          className="checkout-back"
-        >
-          <ArrowLeft size={17} />
-          Back to shopping
-        </button>
-
-        <div className="checkout-brand">
-          <strong>D2C</strong>
-          <span>MALL</span>
+    <div className="page checkout">
+      <div className="container">
+        <div className="checkout-top">
+          <Link to="/cart" className="link">
+            <ArrowLeft size={16} /> Back to bag
+          </Link>
+          <Steps step={step} />
+          <span className={cx("badge", mode === "live" ? "badge-soft-green" : "badge-soft-amber")}>
+            <Lock size={11} /> {mode === "live" ? "Razorpay live" : "Razorpay sandbox"}
+          </span>
         </div>
 
-        <div className="checkout-secure">
-          <ShieldCheck size={16} />
-          Secure Checkout
-        </div>
-      </header>
-
-      <div className="checkout-progress">
-        <div className="checkout-step active">
-          <span>1</span>
-          <div>
-            <strong>Address</strong>
-            <small>Delivery details</small>
-          </div>
-        </div>
-
-        <div className="checkout-progress-line" />
-
-        <div
-          className={`checkout-step ${
-            savedAddress
-              ? "active"
-              : ""
-          }`}
-        >
-          <span>2</span>
-          <div>
-            <strong>Delivery</strong>
-            <small>Serviceability & ETA</small>
-          </div>
-        </div>
-
-        <div className="checkout-progress-line" />
-
-        <div
-          className={`checkout-step ${
-            deliveryChecked
-              ? "active"
-              : ""
-          }`}
-        >
-          <span>3</span>
-          <div>
-            <strong>Payment</strong>
-            <small>Choose payment</small>
-          </div>
-        </div>
-      </div>
-
-      <div className="checkout-layout">
-        <section className="checkout-main">
-          <motion.section
-            className="checkout-section"
-            initial={{
-              opacity: 0,
-              y: 12,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-          >
-            <div className="checkout-section-heading">
-              <div className="checkout-section-icon">
-                <MapPin size={18} />
-              </div>
-
-              <div>
-                <span>STEP 1</span>
-                <h2>Delivery Address</h2>
-                <p>
-                  Where should we deliver your
-                  order?
-                </p>
-              </div>
-            </div>
-
-            <div className="checkout-address-form">
-              <label>
-                Full name
-                <input
-                  value={address.fullName}
-                  onChange={(event) =>
-                    updateAddress(
-                      "fullName",
-                      event.target.value
-                    )
-                  }
-                  placeholder="Enter full name"
-                />
-                {errors.fullName && (
-                  <small>{errors.fullName}</small>
-                )}
-              </label>
-
-              <label>
-                Mobile number
-                <input
-                  value={address.phone}
-                  onChange={(event) =>
-                    updateAddress(
-                      "phone",
-                      event.target.value.replace(
-                        /\D/g,
-                        ""
-                      ).slice(0, 10)
-                    )
-                  }
-                  placeholder="10-digit mobile number"
-                />
-                {errors.phone && (
-                  <small>{errors.phone}</small>
-                )}
-              </label>
-
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={address.email}
-                  onChange={(event) =>
-                    updateAddress(
-                      "email",
-                      event.target.value
-                    )
-                  }
-                  placeholder="you@example.com"
-                />
-                {errors.email && (
-                  <small>{errors.email}</small>
-                )}
-              </label>
-
-              <label className="checkout-full">
-                Address
-                <textarea
-                  value={address.addressLine}
-                  onChange={(event) =>
-                    updateAddress(
-                      "addressLine",
-                      event.target.value
-                    )
-                  }
-                  placeholder="House / flat / street / area"
-                  rows={3}
-                />
-                {errors.addressLine && (
-                  <small>
-                    {errors.addressLine}
-                  </small>
-                )}
-              </label>
-
-              <label>
-                City
-                <input
-                  value={address.city}
-                  onChange={(event) =>
-                    updateAddress(
-                      "city",
-                      event.target.value
-                    )
-                  }
-                  placeholder="City"
-                />
-                {errors.city && (
-                  <small>{errors.city}</small>
-                )}
-              </label>
-
-              <label>
-                State
-                <input
-                  value={address.state}
-                  onChange={(event) =>
-                    updateAddress(
-                      "state",
-                      event.target.value
-                    )
-                  }
-                  placeholder="State"
-                />
-                {errors.state && (
-                  <small>{errors.state}</small>
-                )}
-              </label>
-
-              <label>
-                Pincode
-                <div className="checkout-pincode">
-                  <input
-                    value={address.pincode}
-                    onChange={(event) =>
-                      updateAddress(
-                        "pincode",
-                        event.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 6)
-                      )
-                    }
-                    placeholder="6-digit pincode"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={checkDelivery}
-                    disabled={checkingDelivery}
-                  >
-                    {checkingDelivery
-                      ? "Checking..."
-                      : "Check"}
-                  </button>
+        <div className="checkout-grid">
+          <div className="col gap-16">
+            {/* ---------- Address ---------- */}
+            <section className={cx("co-step", step === 1 && "open")}>
+              <header className="co-head" onClick={() => step > 1 && setStep(1)}>
+                <span className="co-num">{step > 1 ? <Check size={14} /> : 1}</span>
+                <div className="grow">
+                  <b>Delivery address</b>
+                  {step > 1 && address ? (
+                    <div className="small muted">
+                      {address.name}, {address.line1}, {address.city} – {address.pincode}
+                    </div>
+                  ) : null}
                 </div>
-
-                {errors.pincode && (
-                  <small>
-                    {errors.pincode}
-                  </small>
-                )}
-              </label>
-
-              <label>
-                Landmark
-                <input
-                  value={address.landmark}
-                  onChange={(event) =>
-                    updateAddress(
-                      "landmark",
-                      event.target.value
-                    )
-                  }
-                  placeholder="Optional"
-                />
-              </label>
-            </div>
-
-            <div className="checkout-address-types">
-              {["Home", "Work", "Other"].map(
-                (type) => (
-                  <button
-                    type="button"
-                    key={type}
-                    className={
-                      address.type === type
-                        ? "active"
-                        : ""
-                    }
-                    onClick={() =>
-                      updateAddress(
-                        "type",
-                        type
-                      )
-                    }
-                  >
-                    {type}
-                  </button>
-                )
-              )}
-            </div>
-
-            {deliveryChecked && (
-              <motion.div
-                className="checkout-delivery-result"
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <div>
-                  <Check size={17} />
+                {step > 1 ? <button className="btn btn-outline btn-sm">Change</button> : null}
+              </header>
+              {step === 1 ? (
+                <div className="co-body">
+                  {editing ? (
+                    <AddressForm initial={editing === "new" ? { name: user.name, phone: user.phone } : user.addresses.find((a) => a.id === editing)} onSubmit={submitAddress} onCancel={user.addresses.length ? () => setEditing(null) : null} submitLabel="Save & deliver here" />
+                  ) : (
+                    <>
+                      <div className="col gap-10">
+                        {user.addresses.map((a) => {
+                          const p = planFulfilment(a.pincode, lines.map((l) => ({ productId: l.productId, qty: l.qty })), inventory);
+                          return (
+                            <label key={a.id} className={cx("radio-card", addressId === a.id && "active")}>
+                              <input type="radio" name="address" checked={addressId === a.id} onChange={() => setAddressId(a.id)} />
+                              <div className="grow">
+                                <div className="row gap-6 wrap">
+                                  <b>{a.name}</b>
+                                  <span className="badge badge-soft-gray">{a.label || a.type}</span>
+                                  {a.isDefault ? <span className="badge badge-soft-blue">Default</span> : null}
+                                </div>
+                                <p className="small muted mt-4">
+                                  {a.line1}, {a.line2 ? `${a.line2}, ` : ""}
+                                  {a.landmark ? `${a.landmark}, ` : ""}
+                                  {a.city}, {a.state} – <b>{a.pincode}</b>
+                                </p>
+                                <p className="small mt-4">Mobile: {a.phone}</p>
+                                {p.ok ? (
+                                  <p className="xs text-green bold mt-4">
+                                    <Truck size={12} /> Delivery by {dayLabel(p.eta)} · {p.codAvailable ? "COD available" : "Prepaid only"}
+                                  </p>
+                                ) : (
+                                  <p className="xs text-red bold mt-4">{p.reason}</p>
+                                )}
+                                {addressId === a.id ? (
+                                  <div className="row gap-6 mt-12">
+                                    <button type="button" className="btn btn-sm" disabled={!p.ok} onClick={() => setStep(2)}>
+                                      Deliver here
+                                    </button>
+                                    <button type="button" className="btn btn-sm btn-outline" onClick={() => setEditing(a.id)}>
+                                      <Pencil size={13} /> Edit
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <button className="btn btn-outline-blue mt-16" onClick={() => setEditing("new")}>
+                        <Plus size={16} /> Add a new address
+                      </button>
+                      {!user.addresses.length ? <p className="small muted mt-8">You don't have any saved addresses yet.</p> : null}
+                    </>
+                  )}
                 </div>
+              ) : null}
+            </section>
 
-                <section>
-                  <strong>
-                    Delivery available
-                  </strong>
+            {/* ---------- Delivery ---------- */}
+            <section className={cx("co-step", step === 2 && "open")}>
+              <header className="co-head" onClick={() => step > 2 && setStep(2)}>
+                <span className="co-num">{step > 2 ? <Check size={14} /> : 2}</span>
+                <div className="grow">
+                  <b>Delivery options</b>
+                  {step > 2 && plan?.ok ? (
+                    <div className="small muted">
+                      {speed === "express" && plan.expressAvailable ? "Express" : "Standard"} · arrives {dayLabel(speed === "express" && plan.expressAvailable ? plan.expressEta : plan.eta)}
+                    </div>
+                  ) : null}
+                </div>
+                {step > 2 ? <button className="btn btn-outline btn-sm">Change</button> : null}
+              </header>
+              {step === 2 && plan ? (
+                <div className="co-body">
+                  {!plan.ok ? (
+                    <div className="notice error">{plan.reason}</div>
+                  ) : (
+                    <>
+                      <div className="grid grid-2">
+                        <label className={cx("radio-card", speed === "standard" && "active")}>
+                          <input type="radio" checked={speed === "standard"} onChange={() => setSpeed("standard")} />
+                          <div>
+                            <b className="row gap-6">
+                              <Truck size={16} /> Standard delivery
+                            </b>
+                            <p className="small muted">Arrives {dayLabel(plan.eta)}</p>
+                            <p className="xs text-green bold">{summary.freeShipping ? "FREE" : "₹49"}</p>
+                          </div>
+                        </label>
+                        <label className={cx("radio-card", speed === "express" && "active", !plan.expressAvailable && "disabled-card")}>
+                          <input type="radio" disabled={!plan.expressAvailable} checked={speed === "express"} onChange={() => setSpeed("express")} />
+                          <div>
+                            <b className="row gap-6">
+                              <Zap size={16} className="text-orange" /> Express delivery
+                            </b>
+                            <p className="small muted">{plan.expressAvailable ? `Arrives ${dayLabel(plan.expressEta)}` : "Not available for this pincode"}</p>
+                            <p className="xs bold">+₹99</p>
+                          </div>
+                        </label>
+                      </div>
 
-                  <p>
-                    Your pincode is serviceable.
-                    Delivery options will be
-                    selected based on warehouse
-                    stock and courier availability.
+                      <div className="confidence mt-16">
+                        <div className="ring" style={{ "--p": plan.confidence }}>
+                          <b>{plan.confidence}%</b>
+                        </div>
+                        <div className="small">
+                          <b className="text-green">{plan.confidenceLabel} delivery confidence</b>
+                          <div className="xs muted">Allocated from the best warehouse based on stock, distance, SLA and courier serviceability.</div>
+                        </div>
+                      </div>
+
+                      {plan.split ? (
+                        <div className="notice info mt-16">
+                          <Package size={16} /> Items are in stock at different hubs, so your order ships in {plan.shipments.length} packages — no extra charge.
+                        </div>
+                      ) : null}
+
+                      {plan.shipments.map((s, i) => (
+                        <div key={s.warehouseId} className="shipment-plan">
+                          <div className="row between wrap gap-6">
+                            <b className="row gap-6">
+                              <Warehouse size={16} style={{ color: s.warehouse.color }} /> Package {i + 1} · from {s.warehouse.name}
+                            </b>
+                            <span className="xs muted">
+                              {s.km} km · dispatch {s.pastCutoff ? "tomorrow" : "today"} (cut-off {s.warehouse.cutoff})
+                            </span>
+                          </div>
+                          <div className="row gap-6 mt-8 wrap">
+                            {s.items.map((it) => {
+                              const l = lines.find((x) => x.productId === it.productId);
+                              return <Img key={it.productId} src={l?.image} alt="" className="plan-thumb" label="" />;
+                            })}
+                          </div>
+                          <span className="label mt-12" style={{ display: "block" }}>
+                            Courier partner <span className="xs muted">(via Shiprocket)</span>
+                          </span>
+                          <div className="courier-list">
+                            {s.couriers.slice(0, 4).map((c) => {
+                              const chosen = (courierChoice[s.warehouseId] || s.courierId) === c.id;
+                              return (
+                                <label key={c.id} className={cx("courier", chosen && "active")}>
+                                  <input type="radio" checked={chosen} onChange={() => setCourierChoice({ ...courierChoice, [s.warehouseId]: c.id })} />
+                                  <div className="grow">
+                                    <b className="small">{c.name}</b>
+                                    {c.id === s.courierId ? <span className="badge badge-soft-green" style={{ marginLeft: 6 }}>Recommended</span> : null}
+                                    <div className="xs muted row gap-6">
+                                      <Star size={11} fill="#f5a524" color="#f5a524" /> {c.rating} · {c.days} day{c.days > 1 ? "s" : ""} · {c.cod ? "COD" : "Prepaid"}
+                                    </div>
+                                  </div>
+                                  <span className="xs faint">{dayLabel(Date.now() + c.days * 86400000)}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      <button className="btn btn-lg mt-16" onClick={() => setStep(3)}>
+                        Continue to payment
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </section>
+
+            {/* ---------- Payment ---------- */}
+            <section className={cx("co-step", step === 3 && "open")}>
+              <header className="co-head">
+                <span className="co-num">3</span>
+                <b className="grow">Payment</b>
+                <span className="xs muted row gap-4">
+                  <ShieldCheck size={14} /> 100% secure
+                </span>
+              </header>
+              {step === 3 ? (
+                <div className="co-body">
+                  {failure ? (
+                    <div className="pay-fail fade-up">
+                      <XCircle size={28} />
+                      <div className="grow">
+                        <b>Payment unsuccessful</b>
+                        <p className="small">{failure.error}</p>
+                        <p className="xs muted mt-4">
+                          Reserved stock was released. If money was debited, it'll be auto-refunded in 5–7 working days. Order {failure.orderId ? <b>{failure.orderId}</b> : null} is saved — retry within 15 minutes to keep your prices.
+                        </p>
+                        <div className="row gap-6 mt-12 wrap">
+                          <button className="btn btn-sm" onClick={() => retry()} disabled={busy}>
+                            <RefreshCcw size={14} /> Retry payment
+                          </button>
+                          {!codDisabledReason ? (
+                            <button className="btn btn-sm btn-outline" onClick={() => { setMethod("cod"); setFailure(null); idem.current = `idem_${randomId(16)}`; }}>
+                              Pay with COD instead
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="pay-methods">
+                    {PAYMENT_METHODS.map((m) => {
+                      const Icon = METHOD_ICONS[m.id];
+                      const disabled = m.id === "cod" && !!codDisabledReason;
+                      return (
+                        <label key={m.id} className={cx("radio-card", method === m.id && "active", disabled && "disabled-card")}>
+                          <input type="radio" name="pay" disabled={disabled} checked={method === m.id} onChange={() => setMethod(m.id)} />
+                          <span className="pay-icon">
+                            <Icon size={18} />
+                          </span>
+                          <div className="grow">
+                            <b className="small">{m.label}</b>
+                            <p className="xs muted">{disabled ? codDisabledReason : m.id === "cod" ? `${m.sub} · ₹29 handling fee` : m.sub}</p>
+                            {m.offer && !disabled ? <p className="xs text-green bold">{m.offer}</p> : null}
+                            {method === m.id && m.id === "upi" && user.savedUpi?.length ? (
+                              <p className="xs mt-4">
+                                Saved: <b>{user.savedUpi[0]}</b>
+                              </p>
+                            ) : null}
+                            {method === m.id && m.id === "card" && user.savedCards?.length ? (
+                              <p className="xs mt-4">
+                                Saved: <b>{user.savedCards[0].brand} •••• {user.savedCards[0].last4}</b> ({user.savedCards[0].bank})
+                              </p>
+                            ) : null}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <button className="btn btn-lg btn-block mt-16" onClick={pay} disabled={busy || !plan?.ok}>
+                    <Lock size={17} /> {method === "cod" ? `Place order · ${formatINR(summary.total)}` : `Pay ${formatINR(summary.total)} securely`}
+                  </button>
+                  <p className="xs muted center mt-8">
+                    By placing this order you agree to D2C Mall's terms. Payments are processed by Razorpay and verified on our server.
                   </p>
-                </section>
-              </motion.div>
-            )}
-
-            <button
-              type="button"
-              className="checkout-save-address"
-              onClick={saveAddress}
-            >
-              {savedAddress
-                ? "Address Saved"
-                : "Save & Continue"}
-              <ChevronRight size={16} />
-            </button>
-          </motion.section>
-
-          <motion.section
-            className="checkout-section"
-            initial={{
-              opacity: 0,
-              y: 12,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={{ delay: 0.08 }}
-          >
-            <div className="checkout-section-heading">
-              <div className="checkout-section-icon">
-                <Truck size={18} />
-              </div>
-
-              <div>
-                <span>STEP 2</span>
-                <h2>Delivery & Fulfilment</h2>
-                <p>
-                  Your order will be fulfilled
-                  from the best available location.
-                </p>
-              </div>
-            </div>
-
-            <div className="checkout-delivery-card">
-              <div className="checkout-delivery-icon">
-                <Truck size={20} />
-              </div>
-
-              <div>
-                <strong>
-                  Standard Delivery
-                </strong>
-
-                <span>
-                  Estimated delivery: 3–6
-                  business days
-                </span>
-
-                <small>
-                  Final ETA will be calculated
-                  from warehouse stock,
-                  destination and courier SLA.
-                </small>
-              </div>
-
-              <strong>
-                {shipping === 0
-                  ? "FREE"
-                  : `₹${money(shipping)}`}
-              </strong>
-            </div>
-
-            <div className="checkout-confidence">
-              <div>
-                <Check size={15} />
-                <span>
-                  Stock availability checked
-                </span>
-              </div>
-
-              <div>
-                <Check size={15} />
-                <span>
-                  Courier serviceability checked
-                </span>
-              </div>
-
-              <div>
-                <Check size={15} />
-                <span>
-                  Delivery estimate calculated
-                </span>
-              </div>
-            </div>
-          </motion.section>
-
-          <motion.section
-            className="checkout-section"
-            initial={{
-              opacity: 0,
-              y: 12,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={{ delay: 0.12 }}
-          >
-            <div className="checkout-section-heading">
-              <div className="checkout-section-icon">
-                <CreditCard size={18} />
-              </div>
-
-              <div>
-                <span>STEP 3</span>
-                <h2>Payment Method</h2>
-                <p>
-                  Choose how you'd like to pay.
-                </p>
-              </div>
-            </div>
-
-            <div className="checkout-payment-options">
-              {PAYMENT_OPTIONS.map(
-                (option) => {
-                  const Icon = option.icon;
-
-                  return (
-                    <button
-                      type="button"
-                      key={option.id}
-                      className={`checkout-payment-option ${
-                        paymentMethod ===
-                        option.id
-                          ? "active"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setPaymentMethod(
-                          option.id
-                        )
-                      }
-                    >
-                      <div className="checkout-payment-radio">
-                        {paymentMethod ===
-                          option.id && (
-                          <span />
-                        )}
-                      </div>
-
-                      <Icon size={19} />
-
-                      <div>
-                        <strong>
-                          {option.title}
-                        </strong>
-                        <span>
-                          {option.description}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                }
-              )}
-            </div>
-
-            {paymentMethod === "cod" && (
-              <div className="checkout-cod-note">
-                Cash on Delivery availability
-                will be confirmed against your
-                delivery pincode and order value.
-              </div>
-            )}
-          </motion.section>
-        </section>
-
-        <aside className="checkout-summary">
-          <div className="checkout-summary-heading">
-            <div>
-              <span>YOUR ORDER</span>
-              <h2>Order Summary</h2>
-            </div>
-
-            <strong>
-              {cartCount} items
-            </strong>
-          </div>
-
-          <div className="checkout-order-items">
-            {cart.map((item) => {
-              const image =
-                item.images?.[0] ||
-                item.image ||
-                "";
-
-              return (
-                <div
-                  className="checkout-order-item"
-                  key={[
-                    item.id,
-                    item.selectedSize ||
-                      "default",
-                    item.selectedColor ||
-                      "default",
-                  ].join("__")}
-                >
-                  <div className="checkout-order-image">
-                    <img
-                      src={image}
-                      alt={item.name}
-                    />
-
-                    <span>
-                      {item.quantity}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span>
-                      {item.brand}
-                    </span>
-
-                    <strong>
-                      {item.name}
-                    </strong>
-
-                    {(item.selectedSize ||
-                      item.selectedColor) && (
-                      <small>
-                        {item.selectedSize &&
-                          `Size ${item.selectedSize}`}
-                        {item.selectedSize &&
-                          item.selectedColor &&
-                          " · "}
-                        {item.selectedColor &&
-                          item.selectedColor}
-                      </small>
-                    )}
-                  </div>
-
-                  <strong>
-                    ₹
-                    {money(
-                      item.price *
-                        item.quantity
-                    )}
-                  </strong>
                 </div>
-              );
-            })}
+              ) : null}
+            </section>
           </div>
 
-          <div className="checkout-coupon">
-            <div>
-              <input
-                value={coupon}
-                onChange={(event) => {
-                  setCoupon(
-                    event.target.value
-                  );
-                  setCouponMessage("");
-                }}
-                placeholder="Coupon code"
-              />
-
-              <button
-                type="button"
-                onClick={applyCoupon}
-              >
-                Apply
-              </button>
-            </div>
-
-            {couponMessage && (
-              <span
-                className={
-                  appliedCoupon
-                    ? "success"
-                    : "error"
-                }
-              >
-                {couponMessage}
-              </span>
-            )}
-
-            <small>
-              Try D2C10 or FIRST15
-            </small>
-          </div>
-
-          <div className="checkout-price-details">
-            <div>
-              <span>
-                MRP ({cartCount} items)
-              </span>
-
-              <strong>
-                ₹{money(cartMrpTotal)}
-              </strong>
-            </div>
-
-            <div>
-              <span>Product discount</span>
-
-              <strong className="positive">
-                -₹{money(productSavings)}
-              </strong>
-            </div>
-
-            <div>
-              <span>Shipping</span>
-
-              <strong
-                className={
-                  shipping === 0
-                    ? "positive"
-                    : ""
-                }
-              >
-                {shipping === 0
-                  ? "FREE"
-                  : `₹${money(shipping)}`}
-              </strong>
-            </div>
-
-            {couponDiscount > 0 && (
-              <div>
-                <span>
-                  Coupon discount
-                </span>
-
-                <strong className="positive">
-                  -₹{money(couponDiscount)}
-                </strong>
+          <aside className="col gap-16 sticky-top">
+            <div className="card card-pad">
+              <b className="small">Order items ({lines.length})</b>
+              <div className="co-items">
+                {lines.map((l) => (
+                  <div key={l.key} className="row gap-10">
+                    <Img src={l.image} alt="" className="co-item-img" label="" />
+                    <div className="grow" style={{ minWidth: 0 }}>
+                      <b className="xs ellipsis" style={{ display: "block" }}>
+                        {l.name}
+                      </b>
+                      <span className="xs muted">
+                        {[l.size, l.color, `Qty ${l.qty}`].filter(Boolean).join(" · ")}
+                      </span>
+                    </div>
+                    <b className="xs">{formatINR(l.price * l.qty)}</b>
+                  </div>
+                ))}
               </div>
-            )}
-
-            <div className="checkout-total">
-              <span>Total</span>
-
-              <strong>
-                ₹{money(grandTotal)}
-              </strong>
             </div>
-          </div>
-
-          <div className="checkout-saving">
-            You're saving ₹
-            {money(
-              productSavings +
-                couponDiscount
-            )}{" "}
-            on this order
-          </div>
-
-          <button
-            type="button"
-            className="checkout-place-order"
-            onClick={handlePlaceOrder}
-            disabled={placingOrder}
-          >
-            {placingOrder
-              ? "Processing..."
-              : paymentMethod === "cod"
-              ? "Place Order"
-              : "Continue to Payment"}
-
-            {!placingOrder && (
-              <ChevronRight size={18} />
-            )}
-          </button>
-
-          <div className="checkout-trust">
-            <div>
-              <ShieldCheck size={15} />
-              Secure checkout
+            <CouponPanel paymentMethod={method} />
+            <PriceDetails summary={summary} />
+            <div className="card card-pad row gap-10">
+              <MapPin size={16} className="text-blue" />
+              <span className="xs muted">
+                GST invoice will be generated for {user.name}. Tax included: {formatINR(summary.gst)}
+              </span>
             </div>
-
-            <div>
-              <Check size={15} />
-              Easy returns
-            </div>
-
-            <div>
-              <Package size={15} />
-              Genuine products
-            </div>
-          </div>
-        </aside>
+          </aside>
+        </div>
       </div>
-    </main>
+
+      <Modal open={!!stage && stage !== "awaiting_payment"} onClose={() => {}} hideHead>
+        <div className="stage-box">
+          {stage === "done" ? (
+            <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="stage-done">
+              <CheckCircle2 size={56} />
+              <b>Order confirmed!</b>
+            </motion.div>
+          ) : (
+            <>
+              <span className="spinner" style={{ width: 36, height: 36, color: "var(--blue)" }} />
+              <b className="mt-12">Processing your order securely</b>
+              <div className="stage-list">
+                {STAGES.map((s, i) => {
+                  const cur = STAGES.findIndex((x) => x.key === stage);
+                  const state = i < cur ? "done" : i === cur ? "active" : "";
+                  if (method === "cod" && ["creating_payment", "awaiting_payment", "verifying"].includes(s.key)) return null;
+                  return (
+                    <div key={s.key} className={cx("stage-row", state)}>
+                      <span className="stage-dot">{state === "done" ? <Check size={11} /> : null}</span>
+                      {s.label}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="xs muted mt-12">
+                <AlertTriangle size={12} /> Please don't refresh or press back.
+              </p>
+            </>
+          )}
+        </div>
+      </Modal>
+      <AnimatePresence />
+    </div>
   );
 }

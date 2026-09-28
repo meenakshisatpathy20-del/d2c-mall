@@ -477,7 +477,7 @@ export default function MainHeader() {
             <MapPin size={18} />
             <span>
               <span className="deliver-label">Deliver to</span>
-              <b>{pincode ? `${pincode.city?.split(" ")[0] || ""} ${pincode.pincode}` : "Select pincode"}</b>
+              <b>{pincode ? `${pincode.city?.split(/[ /]/)[0] || ""} ${pincode.pincode}` : "Select pincode"}</b>
             </span>
             <ChevronDown size={15} />
           </button>

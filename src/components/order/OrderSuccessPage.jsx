@@ -1,594 +1,157 @@
+import { useMemo } from "react";
+import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  Check,
-  Copy,
-  Download,
-  MapPin,
-  Package,
-  ShoppingBag,
-  Truck,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowRight, CheckCircle2, CreditCard, MapPin, Package, ShieldCheck, Truck, Warehouse } from "lucide-react";
+import { useStore } from "../../lib/store";
+import { getWarehouse, getCourier } from "../../data/logistics";
+import { dayLabel, formatDateTime, formatINR } from "../../lib/format";
+import { getTrendingProducts } from "../../data/catalog";
+import ProductCard from "../common/ProductCard";
+import { Empty, Img, Rail, SectionHead, useDocumentTitle } from "../common/ui";
 import "./OrderSuccessPage.css";
 
-const money = (value) =>
-  Number(value || 0).toLocaleString("en-IN");
+const COLORS = ["#ff6b00", "#2457ff", "#12b76a", "#7f56d9", "#ff4056", "#f79009"];
 
-export default function OrderSuccessPage({
-  order,
-  onContinueShopping,
-  onViewOrders,
-  onTrackOrder,
-}) {
-  const [copied, setCopied] = useState(false);
+function Confetti() {
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 70 }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        delay: Math.random() * 0.6,
+        dur: 2.2 + Math.random() * 1.8,
+        color: COLORS[i % COLORS.length],
+        rot: Math.random() * 360,
+        size: 6 + Math.random() * 8,
+      })),
+    []
+  );
+  return (
+    <div className="confetti" aria-hidden>
+      {pieces.map((p) => (
+        <span key={p.id} style={{ left: `${p.left}%`, background: p.color, width: p.size, height: p.size * 0.45, animationDelay: `${p.delay}s`, animationDuration: `${p.dur}s`, transform: `rotate(${p.rot}deg)` }} />
+      ))}
+    </div>
+  );
+}
 
-  const orderData = useMemo(() => {
-    const source = order || {};
+export default function OrderSuccessPage() {
+  const { orderId } = useParams();
+  const order = useStore((s) => s.orders.find((o) => o.id === orderId));
+  useDocumentTitle("Order confirmed");
 
-    const items = source.items || [];
+  if (!order) {
+    return (
+      <div className="page container">
+        <Empty icon={<Package size={34} />} title="Order not found" action={<Link to="/orders" className="btn">My orders</Link>} />
+      </div>
+    );
+  }
 
-    const pricing = source.pricing || {};
-
-    const customer =
-      source.customer || source.address || {};
-
-    const orderId =
-      source.orderId ||
-      source.id ||
-      `D2C${Date.now()
-        .toString()
-        .slice(-8)}`;
-
-    const total =
-      pricing.total ??
-      source.total ??
-      items.reduce(
-        (sum, item) =>
-          sum +
-          Number(item.price || 0) *
-            Number(item.quantity || 1),
-        0
-      );
-
-    return {
-      ...source,
-      orderId,
-      items,
-      customer,
-      pricing: {
-        ...pricing,
-        total,
-      },
-      status:
-        source.status || "Order Confirmed",
-      paymentStatus:
-        source.paymentStatus ||
-        "Payment confirmation pending",
-      paymentMethod:
-        source.paymentMethod || "Online Payment",
-      estimatedDelivery:
-        source.estimatedDelivery ||
-        "3–6 business days",
-      shipmentId:
-        source.shipmentId || null,
-      awb:
-        source.awb || null,
-      carrier:
-        source.carrier || null,
-    };
-  }, [order]);
-
-  const copyOrderId = async () => {
-    try {
-      await navigator.clipboard.writeText(
-        orderData.orderId
-      );
-
-      setCopied(true);
-
-      setTimeout(() => {
-        setCopied(false);
-      }, 1800);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  const handleDownloadInvoice = () => {
-    window.print();
-  };
+  const cod = order.payment.method === "cod";
 
   return (
-    <main className="order-success-page">
-      <section className="order-success-hero">
-        <motion.div
-          className="order-success-check"
-          initial={{
-            scale: 0,
-            opacity: 0,
-          }}
-          animate={{
-            scale: 1,
-            opacity: 1,
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 220,
-            damping: 16,
-          }}
-        >
-          <Check size={34} />
+    <div className="page success">
+      <Confetti />
+      <div className="container page-narrow">
+        <motion.div className="success-hero" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <motion.span className="success-check" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", delay: 0.15 }}>
+            <CheckCircle2 size={44} />
+          </motion.span>
+          <h1>Order confirmed! 🎉</h1>
+          <p>
+            Thank you, {order.customer.split(" ")[0]}. Your order <b>{order.id}</b> has been placed and {order.shipments.length > 1 ? `${order.shipments.length} shipments are` : "your shipment is"} being prepared.
+          </p>
+          <div className="success-eta">
+            <Truck size={18} /> Arriving by <b>{dayLabel(order.etaAt)}</b>
+          </div>
+          <div className="row gap-6 wrap mt-16" style={{ justifyContent: "center" }}>
+            <Link to={`/orders/${order.id}`} className="btn btn-lg">
+              Track order <ArrowRight size={17} />
+            </Link>
+            <Link to="/shop" className="btn btn-lg btn-glass">
+              Continue shopping
+            </Link>
+          </div>
         </motion.div>
 
-        <motion.span
-          initial={{
-            opacity: 0,
-            y: 8,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{ delay: 0.15 }}
-        >
-          ORDER CONFIRMED
-        </motion.span>
-
-        <motion.h1
-          initial={{
-            opacity: 0,
-            y: 8,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{ delay: 0.2 }}
-        >
-          Your order is on its way to
-          becoming a reality.
-        </motion.h1>
-
-        <motion.p
-          initial={{
-            opacity: 0,
-            y: 8,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{ delay: 0.25 }}
-        >
-          We've received your order and will
-          keep you updated as it moves through
-          fulfilment and delivery.
-        </motion.p>
-
-        <div className="order-number">
-          <span>ORDER ID</span>
-
-          <strong>
-            {orderData.orderId}
-          </strong>
-
-          <button
-            type="button"
-            onClick={copyOrderId}
-            aria-label="Copy order ID"
-          >
-            {copied ? (
-              <Check size={15} />
-            ) : (
-              <Copy size={15} />
-            )}
-          </button>
-        </div>
-      </section>
-
-      <section className="order-success-layout">
-        <div className="order-success-main">
-          <section className="order-success-card">
-            <div className="order-card-heading">
-              <div>
-                <span>DELIVERY</span>
-                <h2>Where we're sending it</h2>
-              </div>
-
-              <MapPin size={19} />
-            </div>
-
-            <div className="order-address">
-              <strong>
-                {orderData.customer.fullName ||
-                  "Customer"}
-              </strong>
-
-              <p>
-                {orderData.customer.addressLine ||
-                  orderData.customer.address ||
-                  "Delivery address"}
-              </p>
-
-              <p>
-                {[
-                  orderData.customer.city,
-                  orderData.customer.state,
-                  orderData.customer.pincode,
-                ]
-                  .filter(Boolean)
-                  .join(", ")}
-              </p>
-
-              {orderData.customer.phone && (
-                <span>
-                  +91{" "}
-                  {orderData.customer.phone}
-                </span>
-              )}
-            </div>
-          </section>
-
-          <section className="order-success-card">
-            <div className="order-card-heading">
-              <div>
-                <span>ITEMS</span>
-                <h2>
-                  What you've ordered
-                </h2>
-              </div>
-
-              <ShoppingBag size={19} />
-            </div>
-
-            <div className="order-items">
-              {orderData.items.map(
-                (item, index) => {
-                  const image =
-                    item.images?.[0] ||
-                    item.image ||
-                    "";
-
-                  return (
-                    <article
-                      className="order-item"
-                      key={[
-                        item.id,
-                        item.selectedSize ||
-                          "default",
-                        item.selectedColor ||
-                          "default",
-                        index,
-                      ].join("__")}
-                    >
-                      <div className="order-item-image">
-                        <img
-                          src={image}
-                          alt={item.name}
-                        />
-
-                        <span>
-                          {item.quantity || 1}
-                        </span>
-                      </div>
-
-                      <div className="order-item-info">
-                        <span>
-                          {item.brand}
-                        </span>
-
-                        <h3>
-                          {item.name}
-                        </h3>
-
-                        {(item.selectedSize ||
-                          item.selectedColor) && (
-                          <small>
-                            {item.selectedSize &&
-                              `Size ${item.selectedSize}`}
-                            {item.selectedSize &&
-                              item.selectedColor &&
-                              " · "}
-                            {item.selectedColor &&
-                              item.selectedColor}
-                          </small>
-                        )}
-                      </div>
-
-                      <strong>
-                        ₹
-                        {money(
-                          Number(
-                            item.price || 0
-                          ) *
-                            Number(
-                              item.quantity || 1
-                            )
-                        )}
-                      </strong>
-                    </article>
-                  );
-                }
-              )}
-            </div>
-          </section>
-
-          <section className="order-success-card">
-            <div className="order-card-heading">
-              <div>
-                <span>FULFILMENT</span>
-                <h2>
-                  Your delivery journey
-                </h2>
-              </div>
-
-              <Truck size={19} />
-            </div>
-
-            <div className="order-timeline">
-              <div className="order-timeline-item active">
-                <div className="order-timeline-dot">
-                  <Check size={11} />
-                </div>
-
-                <div>
-                  <strong>
-                    Order confirmed
-                  </strong>
-
-                  <span>
-                    We've received your order.
-                  </span>
-                </div>
-              </div>
-
-              <div className="order-timeline-item">
-                <div className="order-timeline-dot">
-                  <Package size={11} />
-                </div>
-
-                <div>
-                  <strong>
-                    Preparing your order
-                  </strong>
-
-                  <span>
-                    Warehouse fulfilment will
-                    begin after payment and stock
-                    confirmation.
-                  </span>
-                </div>
-              </div>
-
-              <div className="order-timeline-item">
-                <div className="order-timeline-dot">
-                  <Truck size={11} />
-                </div>
-
-                <div>
-                  <strong>
-                    Shipped & tracked
-                  </strong>
-
-                  <span>
-                    Courier and AWB details will
-                    appear once the shipment is
-                    created.
-                  </span>
-                </div>
-              </div>
-
-              <div className="order-timeline-item">
-                <div className="order-timeline-dot">
-                  <MapPin size={11} />
-                </div>
-
-                <div>
-                  <strong>
-                    Delivered
-                  </strong>
-
-                  <span>
-                    Estimated delivery:{" "}
-                    {orderData.estimatedDelivery}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {(orderData.shipmentId ||
-              orderData.awb ||
-              orderData.carrier) && (
-              <div className="shipment-details">
-                {orderData.shipmentId && (
-                  <div>
-                    <span>
-                      Shipment ID
-                    </span>
-                    <strong>
-                      {orderData.shipmentId}
-                    </strong>
-                  </div>
-                )}
-
-                {orderData.awb && (
-                  <div>
-                    <span>AWB</span>
-                    <strong>
-                      {orderData.awb}
-                    </strong>
-                  </div>
-                )}
-
-                {orderData.carrier && (
-                  <div>
-                    <span>Carrier</span>
-                    <strong>
-                      {orderData.carrier}
-                    </strong>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-        </div>
-
-        <aside className="order-success-sidebar">
-          <section className="order-success-card order-summary-card">
-            <div className="order-card-heading">
-              <div>
-                <span>PAYMENT</span>
-                <h2>Order summary</h2>
-              </div>
-            </div>
-
-            <div className="order-payment-status">
-              <div>
-                <Check size={14} />
-              </div>
-
-              <div>
-                <strong>
-                  {orderData.paymentStatus}
-                </strong>
-
-                <span>
-                  {orderData.paymentMethod}
-                </span>
-              </div>
-            </div>
-
-            <div className="order-price-details">
-              <div>
-                <span>MRP</span>
-
-                <strong>
-                  ₹
-                  {money(
-                    orderData.pricing.mrp
-                  )}
-                </strong>
-              </div>
-
-              <div>
-                <span>Product discount</span>
-
-                <strong className="positive">
-                  -₹
-                  {money(
-                    orderData.pricing
-                      .productSavings
-                  )}
-                </strong>
-              </div>
-
-              <div>
-                <span>Shipping</span>
-
-                <strong>
-                  {orderData.pricing.shipping ===
-                  0
-                    ? "FREE"
-                    : `₹${money(
-                        orderData.pricing
-                          .shipping
-                      )}`}
-                </strong>
-              </div>
-
-              {orderData.pricing
-                .couponDiscount > 0 && (
-                <div>
-                  <span>
-                    Coupon discount
-                  </span>
-
-                  <strong className="positive">
-                    -₹
-                    {money(
-                      orderData.pricing
-                        .couponDiscount
-                    )}
-                  </strong>
-                </div>
-              )}
-
-              <div className="order-total">
-                <span>Total paid</span>
-
-                <strong>
-                  ₹
-                  {money(
-                    orderData.pricing.total
-                  )}
-                </strong>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="order-invoice-button"
-              onClick={handleDownloadInvoice}
-            >
-              <Download size={15} />
-              Download invoice
-            </button>
-          </section>
-
-          <section className="order-success-card order-next-card">
-            <span>WHAT'S NEXT?</span>
-
-            <h2>
-              Follow your order every step
-              of the way.
-            </h2>
-
-            <p>
-              Once your shipment is created,
-              your carrier, AWB and live tracking
-              information will appear here.
+        <div className="grid grid-3 mt-24">
+          <div className="card card-pad">
+            <b className="row gap-6 small">
+              <MapPin size={16} className="text-blue" /> Delivering to
+            </b>
+            <p className="small mt-8">
+              <b>{order.address.name}</b>
+              <br />
+              {order.address.line1}, {order.address.city} – {order.address.pincode}
+              <br />
+              {order.address.phone}
             </p>
-
-            <button
-              type="button"
-              onClick={() =>
-                onTrackOrder?.(orderData)
-              }
-            >
-              Track order
-              <ArrowRight size={15} />
-            </button>
-          </section>
-
-          <div className="order-help">
-            Need help with your order?
-            <button type="button">
-              Contact support
-            </button>
           </div>
-        </aside>
-      </section>
+          <div className="card card-pad">
+            <b className="row gap-6 small">
+              <CreditCard size={16} className="text-blue" /> Payment
+            </b>
+            <p className="small mt-8">
+              <b>{cod ? `Pay ${formatINR(order.pricing.total)} on delivery` : `${formatINR(order.pricing.total)} paid`}</b>
+              <br />
+              {order.payment.instrument}
+              {!cod ? (
+                <>
+                  <br />
+                  <span className="xs text-green bold row gap-4">
+                    <ShieldCheck size={12} /> Signature verified · {order.payment.razorpayPaymentId}
+                  </span>
+                </>
+              ) : null}
+            </p>
+          </div>
+          <div className="card card-pad">
+            <b className="row gap-6 small">
+              <Warehouse size={16} className="text-blue" /> Fulfilment
+            </b>
+            {order.shipments.map((s) => (
+              <p key={s.id} className="small mt-8">
+                <b>{getWarehouse(s.warehouseId).short}</b> → {getCourier(s.courierId).name}
+                <br />
+                <span className="xs muted">AWB {s.awb}</span>
+              </p>
+            ))}
+          </div>
+        </div>
 
-      <section className="order-success-actions">
-        <button
-          type="button"
-          className="secondary"
-          onClick={() =>
-            onViewOrders?.()
-          }
-        >
-          View all orders
-        </button>
+        <div className="card card-pad mt-16">
+          <div className="row between mb-16">
+            <b>Items ({order.items.length})</b>
+            <span className="xs muted">Placed {formatDateTime(order.createdAt)}</span>
+          </div>
+          <div className="col gap-10">
+            {order.items.map((i) => (
+              <div key={i.lineId} className="row gap-16">
+                <Img src={i.image} alt="" className="succ-img" label="" />
+                <div className="grow" style={{ minWidth: 0 }}>
+                  <b className="small">{i.brand}</b>
+                  <div className="xs muted ellipsis">{i.name}</div>
+                  <div className="xs muted">{[i.size && `Size ${i.size}`, i.color, `Qty ${i.qty}`].filter(Boolean).join(" · ")}</div>
+                </div>
+                <b className="small">{formatINR(i.price * i.qty)}</b>
+              </div>
+            ))}
+          </div>
+          <div className="notice success mt-16">
+            <CheckCircle2 size={16} /> Confirmation sent by email, SMS & WhatsApp. You'll get live updates as your order moves.
+          </div>
+        </div>
 
-        <button
-          type="button"
-          onClick={onContinueShopping}
-        >
-          Continue shopping
-          <ArrowRight size={16} />
-        </button>
-      </section>
-    </main>
+        <section className="section">
+          <SectionHead title="You might also like" eyebrow="Keep exploring" />
+          <Rail>
+            {getTrendingProducts().map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </Rail>
+        </section>
+      </div>
+    </div>
   );
 }

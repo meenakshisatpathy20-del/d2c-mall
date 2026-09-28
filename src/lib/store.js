@@ -27,15 +27,19 @@ function load() {
 let state = load();
 let saveTimer = null;
 
+function flush() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+  } catch {
+    /* quota / private mode — keep in memory */
+  }
+}
+
 function persist() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {
-      /* quota / private mode — keep in memory */
-    }
-  }, 120);
+  saveTimer = setTimeout(flush, 80);
 }
 
 export function getState() {
@@ -66,8 +70,11 @@ export function resetStore() {
   listeners.forEach((l) => l());
 }
 
-// Sync across tabs
+// Sync across tabs; flush pending writes when the page is hidden/unloaded
 if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", flush);
+  window.addEventListener("beforeunload", flush);
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flush());
   window.addEventListener("storage", (e) => {
     if (e.key !== KEY || !e.newValue) return;
     try {
