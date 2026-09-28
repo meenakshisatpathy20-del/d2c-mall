@@ -1,437 +1,173 @@
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  ArrowRight,
-  Check,
-  ChevronRight,
-  Minus,
-  Plus,
-  ShoppingBag,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { AlertTriangle, ArrowRight, Bookmark, ShoppingBag, Tag, Trash2, Truck, X } from "lucide-react";
 import { useShop } from "../../context/ShopContext";
+import { formatINR } from "../../lib/format";
+import { FREE_SHIPPING_THRESHOLD } from "../../lib/pricing";
+import { getTrendingProducts } from "../../data/catalog";
+import { Drawer, Empty, Img, QtyStepper } from "../common/ui";
 import "./CartDrawer.css";
 
-const FREE_SHIPPING_LIMIT = 999;
-
-const money = (value) =>
-  Number(value || 0).toLocaleString("en-IN");
-
-export default function CartDrawer({
-  open,
-  onClose,
-  onCheckout,
-  onViewProduct,
-}) {
-  const {
-    cart,
-    cartCount,
-    cartSubtotal,
-    cartMrpTotal,
-    productSavings,
-    incrementCartItem,
-    decrementCartItem,
-    removeFromCart,
-  } = useShop();
-
-  const shipping = useMemo(() => {
-    if (cartSubtotal === 0) return 0;
-
-    return cartSubtotal >= FREE_SHIPPING_LIMIT
-      ? 0
-      : 49;
-  }, [cartSubtotal]);
-
-  const grandTotal = cartSubtotal + shipping;
-
-  const amountForFreeShipping = Math.max(
-    FREE_SHIPPING_LIMIT - cartSubtotal,
-    0
+export function FreeShippingBar({ summary }) {
+  const pct = Math.min(100, ((FREE_SHIPPING_THRESHOLD - summary.amountForFreeShipping) / FREE_SHIPPING_THRESHOLD) * 100);
+  return (
+    <div className="ship-bar">
+      <div className="row gap-6 small">
+        <Truck size={16} className={summary.freeShipping ? "text-green" : "text-orange"} />
+        {summary.freeShipping ? (
+          <span>
+            <b className="text-green">Yay! Free delivery</b> unlocked on this order
+          </span>
+        ) : (
+          <span>
+            Add <b>{formatINR(summary.amountForFreeShipping)}</b> more for <b>FREE delivery</b>
+          </span>
+        )}
+      </div>
+      <div className={`progress mt-8 ${summary.freeShipping ? "green" : ""}`}>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+    </div>
   );
+}
 
-  const freeShippingProgress = Math.min(
-    (cartSubtotal / FREE_SHIPPING_LIMIT) * 100,
-    100
-  );
+export default function CartDrawer() {
+  const { cart, cartOpen, closeCart, summary, updateQty, removeFromCart, saveForLater, cartCount, savedForLater, addToCart } = useShop();
+  const navigate = useNavigate();
+  const blocked = cart.some((i) => i.outOfStock || i.exceedsStock);
+  const suggestions = getTrendingProducts().filter((p) => !cart.some((c) => c.productId === p.id)).slice(0, 4);
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            className="cart-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
+    <Drawer open={cartOpen} onClose={closeCart}>
+      <div className="cdrawer">
+        <div className="cdrawer-head">
+          <div>
+            <b>Your bag</b>
+            <span className="xs muted"> · {cartCount} item{cartCount === 1 ? "" : "s"}</span>
+          </div>
+          <button className="icon-btn sm" onClick={closeCart} aria-label="Close bag">
+            <X size={18} />
+          </button>
+        </div>
 
-          <motion.aside
-            className="cart-drawer"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{
-              type: "spring",
-              stiffness: 340,
-              damping: 34,
-            }}
-          >
-            <header className="cart-header">
-              <div>
-                <span className="cart-kicker">
-                  <ShoppingBag size={12} />
-                  YOUR BAG
-                </span>
-
-                <h2>
-                  Shopping Cart{" "}
-                  <small>
-                    {cartCount}{" "}
-                    {cartCount === 1
-                      ? "item"
-                      : "items"}
-                  </small>
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close cart"
-              >
-                <X size={20} />
-              </button>
-            </header>
-
-            {cart.length === 0 ? (
-              <div className="cart-empty">
-                <div className="cart-empty-icon">
-                  <ShoppingBag size={27} />
+        {cart.length ? (
+          <>
+            <div className="cdrawer-body">
+              <FreeShippingBar summary={summary} />
+              {cart.map((item) => (
+                <div key={item.key} className={`citem ${item.outOfStock ? "oos" : ""}`}>
+                  <Link to={`/product/${item.productId}`} onClick={closeCart}>
+                    <Img src={item.image} alt={item.name} className="citem-img" label={item.brand} />
+                  </Link>
+                  <div className="citem-info">
+                    <div className="row between">
+                      <b className="small">{item.brand}</b>
+                      <button className="icon-btn sm" onClick={() => removeFromCart(item.key)} aria-label="Remove">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                    <span className="xs muted ellipsis">{item.name}</span>
+                    <span className="xs muted">
+                      {[item.size && `Size ${item.size}`, item.color].filter(Boolean).join(" · ")}
+                    </span>
+                    {item.outOfStock ? (
+                      <span className="stock-warn">
+                        <AlertTriangle size={13} /> Out of stock — remove or save for later
+                      </span>
+                    ) : item.stock <= 5 ? (
+                      <span className="stock-warn soft">Only {item.stock} left</span>
+                    ) : null}
+                    <div className="row between mt-4">
+                      <QtyStepper size="sm" value={item.qty} max={Math.min(item.stock, 10)} onChange={(q) => updateQty(item.key, q)} />
+                      <div className="right">
+                        <b>{formatINR(item.price * item.qty)}</b>
+                        {item.mrp > item.price ? <div className="xs strike faint">{formatINR(item.mrp * item.qty)}</div> : null}
+                      </div>
+                    </div>
+                    <button className="link xs mt-4" onClick={() => saveForLater(item.key)}>
+                      <Bookmark size={12} /> Save for later
+                    </button>
+                  </div>
                 </div>
-
-                <h3>Your bag is waiting</h3>
-
-                <p>
-                  Discover products, save your favourites
-                  and add something you love.
-                </p>
-
+              ))}
+              {savedForLater.length ? (
+                <Link to="/cart" className="saved-hint" onClick={closeCart}>
+                  <Bookmark size={14} /> {savedForLater.length} item(s) saved for later <ArrowRight size={14} />
+                </Link>
+              ) : null}
+            </div>
+            <div className="cdrawer-foot">
+              {summary.couponCode ? (
+                <div className="row between small">
+                  <span className="row gap-6 text-green bold">
+                    <Tag size={14} /> {summary.couponCode} applied
+                  </span>
+                  <span className="text-green bold">−{formatINR(summary.couponDiscount)}</span>
+                </div>
+              ) : null}
+              <div className="row between small">
+                <span className="muted">You save</span>
+                <span className="text-green bold">{formatINR(summary.savings)}</span>
+              </div>
+              <div className="row between">
+                <b>Total</b>
+                <b style={{ fontSize: 20 }}>{formatINR(summary.total)}</b>
+              </div>
+              <div className="grid grid-2">
+                <Link to="/cart" className="btn btn-outline" onClick={closeCart}>
+                  View bag
+                </Link>
                 <button
-                  type="button"
-                  onClick={onClose}
+                  className="btn"
+                  disabled={blocked}
+                  onClick={() => {
+                    closeCart();
+                    navigate("/checkout");
+                  }}
                 >
-                  Start shopping
-                  <ArrowRight size={15} />
+                  Checkout <ArrowRight size={16} />
                 </button>
               </div>
-            ) : (
-              <>
-                <div className="cart-content">
-                  <div className="cart-shipping-banner">
-                    {amountForFreeShipping > 0 ? (
-                      <>
-                        <div>
-                          <span>
-                            Add ₹
-                            {money(
-                              amountForFreeShipping
-                            )}{" "}
-                            more for FREE delivery
-                          </span>
-
-                          <span>
-                            ₹{money(cartSubtotal)} / ₹
-                            {money(
-                              FREE_SHIPPING_LIMIT
-                            )}
-                          </span>
-                        </div>
-
-                        <div className="shipping-progress">
-                          <span
-                            style={{
-                              width: `${freeShippingProgress}%`,
-                            }}
-                          />
-                        </div>
-                      </>
+              {blocked ? <span className="xs text-red center">Resolve stock issues to continue</span> : null}
+            </div>
+          </>
+        ) : (
+          <div className="cdrawer-body">
+            <Empty
+              icon={<ShoppingBag size={34} />}
+              title="Your bag is empty"
+              text="Looks like you haven't added anything yet. Explore today's trending picks."
+              action={
+                <Link to="/shop" className="btn" onClick={closeCart}>
+                  Start shopping
+                </Link>
+              }
+            />
+            <span className="label">Trending now</span>
+            <div className="grid grid-2 mt-8">
+              {suggestions.map((p) => (
+                <div key={p.id} className="mini-sugg">
+                  <Link to={`/product/${p.id}`} onClick={closeCart}>
+                    <Img src={p.images[0]} alt={p.name} ratio="1" label={p.brand} />
+                  </Link>
+                  <b className="xs ellipsis">{p.name}</b>
+                  <div className="row between">
+                    <span className="small bold">{formatINR(p.price)}</span>
+                    {!p.sizes.length ? (
+                      <button className="link xs" onClick={() => addToCart(p)}>
+                        + Add
+                      </button>
                     ) : (
-                      <div className="shipping-unlocked">
-                        <Check size={14} />
-                        Free delivery unlocked
-                      </div>
+                      <Link className="link xs" to={`/product/${p.id}`} onClick={closeCart}>
+                        View
+                      </Link>
                     )}
                   </div>
-
-                  <div className="cart-items">
-                    {cart.map((item) => {
-                      const cartKey = [
-                        item.id,
-                        item.selectedSize ||
-                          "default-size",
-                        item.selectedColor ||
-                          "default-color",
-                      ].join("__");
-
-                      const stock =
-                        item.stock ??
-                        item.availableStock ??
-                        Infinity;
-
-                      const image =
-                        item.images?.[0] ||
-                        item.image ||
-                        "";
-
-                      return (
-                        <article
-                          className="cart-item"
-                          key={cartKey}
-                        >
-                          <button
-                            type="button"
-                            className="cart-item-image"
-                            onClick={() =>
-                              onViewProduct?.(item)
-                            }
-                          >
-                            <img
-                              src={image}
-                              alt={item.name}
-                            />
-                          </button>
-
-                          <div className="cart-item-info">
-                            <div className="cart-item-top">
-                              <div>
-                                <span>
-                                  {item.brand}
-                                </span>
-
-                                <h3>
-                                  {item.name}
-                                </h3>
-                              </div>
-
-                              <button
-                                type="button"
-                                className="cart-remove"
-                                onClick={() =>
-                                  removeFromCart(
-                                    cartKey
-                                  )
-                                }
-                                aria-label="Remove item"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-
-                            {(item.selectedSize ||
-                              item.selectedColor) && (
-                              <div className="cart-variants">
-                                {item.selectedSize && (
-                                  <span>
-                                    Size:{" "}
-                                    <strong>
-                                      {
-                                        item.selectedSize
-                                      }
-                                    </strong>
-                                  </span>
-                                )}
-
-                                {item.selectedColor && (
-                                  <span>
-                                    Colour:{" "}
-                                    <strong>
-                                      {
-                                        item.selectedColor
-                                      }
-                                    </strong>
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            <div className="cart-item-price">
-                              <strong>
-                                ₹{money(item.price)}
-                              </strong>
-
-                              {item.mrp >
-                                item.price && (
-                                <del>
-                                  ₹
-                                  {money(
-                                    item.mrp
-                                  )}
-                                </del>
-                              )}
-                            </div>
-
-                            <div className="cart-item-bottom">
-                              <div className="cart-quantity">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    decrementCartItem(
-                                      cartKey
-                                    )
-                                  }
-                                >
-                                  <Minus size={12} />
-                                </button>
-
-                                <span>
-                                  {item.quantity}
-                                </span>
-
-                                <button
-                                  type="button"
-                                  disabled={
-                                    item.quantity >=
-                                    stock
-                                  }
-                                  onClick={() =>
-                                    incrementCartItem(
-                                      cartKey
-                                    )
-                                  }
-                                >
-                                  <Plus size={12} />
-                                </button>
-                              </div>
-
-                              {stock <= 8 && (
-                                <span className="cart-stock">
-                                  Only {stock} left
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-
-                  <div className="cart-benefits">
-                    <div>
-                      <Check size={14} />
-                      <span>
-                        Genuine products
-                      </span>
-                    </div>
-
-                    <div>
-                      <Check size={14} />
-                      <span>
-                        Easy returns
-                      </span>
-                    </div>
-
-                    <div>
-                      <Check size={14} />
-                      <span>
-                        Secure payments
-                      </span>
-                    </div>
-                  </div>
-
-                  <section className="cart-summary">
-                    <div className="cart-summary-heading">
-                      <h3>Price Details</h3>
-                    </div>
-
-                    <div>
-                      <span>
-                        MRP{" "}
-                        <small>
-                          ({cartCount} items)
-                        </small>
-                      </span>
-
-                      <strong>
-                        ₹{money(cartMrpTotal)}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>
-                        Product discount
-                      </span>
-
-                      <strong className="cart-green">
-                        -₹{money(productSavings)}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>Shipping</span>
-
-                      <strong
-                        className={
-                          shipping === 0
-                            ? "cart-green"
-                            : ""
-                        }
-                      >
-                        {shipping === 0
-                          ? "FREE"
-                          : `₹${money(shipping)}`}
-                      </strong>
-                    </div>
-
-                    <div className="cart-total-row">
-                      <span>Total Amount</span>
-
-                      <strong>
-                        ₹{money(grandTotal)}
-                      </strong>
-                    </div>
-
-                    {productSavings > 0 && (
-                      <div className="cart-you-save">
-                        You are saving ₹
-                        {money(productSavings)} on this
-                        order
-                      </div>
-                    )}
-                  </section>
                 </div>
-
-                <footer className="cart-footer">
-                  <div className="cart-footer-total">
-                    <span>Total</span>
-
-                    <strong>
-                      ₹{money(grandTotal)}
-                    </strong>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="cart-checkout"
-                    onClick={() =>
-                      onCheckout?.({
-                        items: cart,
-                        subtotal: cartSubtotal,
-                        shipping,
-                        total: grandTotal,
-                      })
-                    }
-                  >
-                    Proceed to Checkout
-                    <ChevronRight size={17} />
-                  </button>
-                </footer>
-              </>
-            )}
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </Drawer>
   );
 }

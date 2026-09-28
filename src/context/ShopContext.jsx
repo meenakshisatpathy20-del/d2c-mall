@@ -1,418 +1,275 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+/*
+ * ShopContext — customer-facing shopping state and actions:
+ * cart (with stock validation), save for later, wishlist, recently viewed,
+ * delivery pincode, coupons, quick view and drawers.
+ */
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { getState, setState, useStore } from "../lib/store";
+import { productMap } from "../data/catalog";
+import { stockOf } from "../lib/services/inventory";
+import { computeSummary } from "../lib/pricing";
+import { toast } from "../lib/toast";
+import { useCurrentUser } from "../lib/services/account";
 
 const ShopContext = createContext(null);
 
-const STORAGE_KEYS = {
-  cart: "d2c_cart",
-  wishlist: "d2c_wishlist",
-  recentlyViewed: "d2c_recently_viewed",
-};
+export const cartKey = (item) => `${item.productId}__${item.size || "-"}__${item.color || "-"}`;
 
-function readStorage(key, fallback = []) {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : fallback;
-  } catch {
-    return fallback;
-  }
+export function hydrateLine(line, inventory) {
+  const p = productMap[line.productId];
+  if (!p) return null;
+  const stock = stockOf(p.id, inventory).sellable;
+  return {
+    ...line,
+    key: cartKey(line),
+    product: p,
+    name: p.name,
+    brand: p.brand,
+    image: p.images[0],
+    category: p.category,
+    price: p.price,
+    mrp: p.mrp,
+    weightKg: p.weightKg,
+    stock,
+    outOfStock: stock <= 0,
+    exceedsStock: line.qty > stock,
+  };
 }
 
 export function ShopProvider({ children }) {
-  const [cart, setCart] = useState(() =>
-    readStorage(STORAGE_KEYS.cart)
-  );
-
-  const [wishlist, setWishlist] = useState(() =>
-    readStorage(STORAGE_KEYS.wishlist)
-  );
-
-  const [recentlyViewed, setRecentlyViewed] = useState(() =>
-    readStorage(STORAGE_KEYS.recentlyViewed)
-  );
+  const cartLines = useStore((s) => s.cart);
+  const savedLines = useStore((s) => s.savedForLater);
+  const wishlistIds = useStore((s) => s.wishlist);
+  const recentIds = useStore((s) => s.recentlyViewed);
+  const inventory = useStore((s) => s.inventory);
+  const pincode = useStore((s) => s.pincode);
+  const appliedCoupon = useStore((s) => s.appliedCoupon);
+  const couponUsage = useStore((s) => s.couponUsage);
+  const orders = useStore((s) => s.orders);
+  const user = useCurrentUser();
 
   const [cartOpen, setCartOpen] = useState(false);
-  const [wishlistOpen, setWishlistOpen] = useState(false);
+  const [quickViewId, setQuickViewId] = useState(null);
+  const [pincodeOpen, setPincodeOpen] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEYS.cart,
-      JSON.stringify(cart)
-    );
-  }, [cart]);
+  const cart = useMemo(() => cartLines.map((l) => hydrateLine(l, inventory)).filter(Boolean), [cartLines, inventory]);
+  const savedForLater = useMemo(() => savedLines.map((l) => hydrateLine(l, inventory)).filter(Boolean), [savedLines, inventory]);
+  const wishlist = useMemo(() => wishlistIds.map((id) => productMap[id]).filter(Boolean), [wishlistIds]);
+  const recentlyViewed = useMemo(() => recentIds.map((id) => productMap[id]).filter(Boolean), [recentIds]);
 
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEYS.wishlist,
-      JSON.stringify(wishlist)
-    );
-  }, [wishlist]);
+  const userOrders = useMemo(
+    () => (user ? orders.filter((o) => o.userId === user.id && o.status !== "payment_failed" && o.status !== "pending_payment").length : 0),
+    [orders, user]
+  );
+  const usage = useMemo(() => (user ? couponUsage[user.id] || {} : {}), [couponUsage, user]);
 
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEYS.recentlyViewed,
-      JSON.stringify(recentlyViewed)
-    );
-  }, [recentlyViewed]);
+  const summary = useMemo(
+    () =>
+      computeSummary({
+        items: cart.filter((i) => !i.outOfStock).map((i) => ({ ...i, qty: Math.min(i.qty, i.stock) })),
+        couponCode: appliedCoupon,
+        userOrders,
+        usage,
+      }),
+    [cart, appliedCoupon, userOrders, usage]
+  );
 
-  /*
-   * CART
-   */
+  /* ---------- cart ---------- */
 
-  const addToCart = (
-    product,
-    quantity = 1,
-    selectedSize = null,
-    selectedColor = null
-  ) => {
-    if (!product?.id) return false;
-
-    const availableStock =
-      product.stock ??
-      product.availableStock ??
-      Infinity;
-
-    if (availableStock <= 0) {
+  const addToCart = useCallback((product, { qty = 1, size = null, color = null, silent = false } = {}) => {
+    if (!product) return false;
+    if (product.sizes?.length && !size) {
+      toast.error("Please select a size first");
       return false;
     }
-
-    setCart((currentCart) => {
-      const existingIndex = currentCart.findIndex(
-        (item) =>
-          item.id === product.id &&
-          item.selectedSize === selectedSize &&
-          item.selectedColor === selectedColor
-      );
-
-      if (existingIndex === -1) {
-        return [
-          ...currentCart,
-          {
-            ...product,
-            quantity: Math.min(
-              Math.max(quantity, 1),
-              availableStock
-            ),
-            selectedSize,
-            selectedColor,
-          },
-        ];
+    const stock = stockOf(product.id, getState().inventory).sellable;
+    if (stock <= 0) {
+      toast.error("Sorry, this item just went out of stock");
+      return false;
+    }
+    const line = { productId: product.id, size, color: color || product.colors?.[0]?.name || null, qty, addedAt: Date.now() };
+    const key = cartKey(line);
+    let capped = false;
+    setState((st) => {
+      const existing = st.cart.find((l) => cartKey(l) === key);
+      let nextCart;
+      if (existing) {
+        const q = Math.min(existing.qty + qty, stock, 10);
+        capped = q < existing.qty + qty;
+        nextCart = st.cart.map((l) => (cartKey(l) === key ? { ...l, qty: q } : l));
+      } else {
+        capped = qty > stock;
+        nextCart = [...st.cart, { ...line, qty: Math.min(qty, stock, 10) }];
       }
-
-      return currentCart.map((item, index) => {
-        if (index !== existingIndex) {
-          return item;
-        }
-
-        return {
-          ...item,
-          quantity: Math.min(
-            item.quantity + quantity,
-            availableStock
-          ),
-        };
-      });
+      return { ...st, cart: nextCart };
     });
-
-    setCartOpen(true);
+    if (capped) toast.info(`Only ${stock} left in stock — quantity adjusted`);
+    else if (!silent) toast(`Added to bag`, { action: "View bag", onAction: () => setCartOpen(true) });
     return true;
-  };
+  }, []);
 
-  const updateCartQuantity = (cartKey, quantity) => {
-    setCart((currentCart) =>
-      currentCart
-        .map((item) => {
-          if (getCartKey(item) !== cartKey) {
-            return item;
-          }
+  const buyNow = useCallback((product, opts) => addToCart(product, { ...opts, silent: true }), [addToCart]);
 
-          const stock =
-            item.stock ??
-            item.availableStock ??
-            Infinity;
+  const updateQty = useCallback((key, qty) => {
+    setState((st) => ({
+      ...st,
+      cart: st.cart.map((l) => {
+        if (cartKey(l) !== key) return l;
+        const stock = stockOf(l.productId, st.inventory).sellable;
+        const q = Math.max(1, Math.min(Number(qty) || 1, stock || 1, 10));
+        if (Number(qty) > stock) toast.info(`Only ${stock} available`);
+        return { ...l, qty: q };
+      }),
+    }));
+  }, []);
 
-          return {
-            ...item,
-            quantity: Math.min(
-              Math.max(Number(quantity) || 1, 1),
-              stock
-            ),
-          };
-        })
-    );
-  };
+  const changeVariant = useCallback((key, patch) => {
+    setState((st) => {
+      const line = st.cart.find((l) => cartKey(l) === key);
+      if (!line) return st;
+      const updated = { ...line, ...patch };
+      const others = st.cart.filter((l) => cartKey(l) !== key && cartKey(l) !== cartKey(updated));
+      const merged = st.cart.find((l) => cartKey(l) === cartKey(updated) && l !== line);
+      return { ...st, cart: [...others, merged ? { ...updated, qty: Math.min(updated.qty + merged.qty, 10) } : updated] };
+    });
+  }, []);
 
-  const incrementCartItem = (cartKey) => {
-    const item = cart.find(
-      (entry) => getCartKey(entry) === cartKey
-    );
+  const removeFromCart = useCallback((key, { undo = true } = {}) => {
+    const line = getState().cart.find((l) => cartKey(l) === key);
+    setState((st) => ({ ...st, cart: st.cart.filter((l) => cartKey(l) !== key) }));
+    if (line && undo)
+      toast("Removed from bag", {
+        type: "info",
+        action: "Undo",
+        onAction: () => setState((st) => ({ ...st, cart: [...st.cart, line] })),
+      });
+  }, []);
 
-    if (!item) return;
+  const saveForLater = useCallback((key) => {
+    const line = getState().cart.find((l) => cartKey(l) === key);
+    if (!line) return;
+    setState((st) => ({
+      ...st,
+      cart: st.cart.filter((l) => cartKey(l) !== key),
+      savedForLater: [line, ...st.savedForLater.filter((l) => cartKey(l) !== key)],
+    }));
+    toast("Saved for later");
+  }, []);
 
-    updateCartQuantity(
-      cartKey,
-      item.quantity + 1
-    );
-  };
-
-  const decrementCartItem = (cartKey) => {
-    const item = cart.find(
-      (entry) => getCartKey(entry) === cartKey
-    );
-
-    if (!item) return;
-
-    if (item.quantity <= 1) {
-      removeFromCart(cartKey);
+  const moveToCart = useCallback((key) => {
+    const line = getState().savedForLater.find((l) => cartKey(l) === key);
+    if (!line) return;
+    const stock = stockOf(line.productId, getState().inventory).sellable;
+    if (stock <= 0) {
+      toast.error("This item is out of stock");
       return;
     }
+    setState((st) => ({
+      ...st,
+      savedForLater: st.savedForLater.filter((l) => cartKey(l) !== key),
+      cart: [...st.cart.filter((l) => cartKey(l) !== key), { ...line, qty: Math.min(line.qty, stock) }],
+    }));
+    toast("Moved to bag");
+  }, []);
 
-    updateCartQuantity(
-      cartKey,
-      item.quantity - 1
-    );
-  };
+  const removeSaved = useCallback((key) => {
+    setState((st) => ({ ...st, savedForLater: st.savedForLater.filter((l) => cartKey(l) !== key) }));
+  }, []);
 
-  const removeFromCart = (cartKey) => {
-    setCart((currentCart) =>
-      currentCart.filter(
-        (item) => getCartKey(item) !== cartKey
-      )
-    );
-  };
+  const clearCart = useCallback(() => setState((st) => ({ ...st, cart: [], appliedCoupon: null })), []);
 
-  const clearCart = () => {
-    setCart([]);
-  };
+  /* ---------- wishlist ---------- */
 
-  /*
-   * WISHLIST
-   */
+  const isWishlisted = useCallback((id) => wishlistIds.includes(id), [wishlistIds]);
 
-  const isWishlisted = (productId) =>
-    wishlist.some((item) => item.id === productId);
+  const toggleWishlist = useCallback((product) => {
+    if (!product) return;
+    const has = getState().wishlist.includes(product.id);
+    setState((st) => ({
+      ...st,
+      wishlist: has ? st.wishlist.filter((x) => x !== product.id) : [product.id, ...st.wishlist],
+    }));
+    toast(has ? "Removed from wishlist" : "Saved to wishlist ♥", { type: has ? "info" : "success" });
+  }, []);
 
-  const toggleWishlist = (product) => {
-    if (!product?.id) return;
-
-    setWishlist((currentWishlist) => {
-      const exists = currentWishlist.some(
-        (item) => item.id === product.id
-      );
-
-      if (exists) {
-        return currentWishlist.filter(
-          (item) => item.id !== product.id
-        );
-      }
-
-      return [...currentWishlist, product];
-    });
-  };
-
-  const removeFromWishlist = (productId) => {
-    setWishlist((currentWishlist) =>
-      currentWishlist.filter(
-        (item) => item.id !== productId
-      )
-    );
-  };
-
-  const moveWishlistToCart = (
-    product,
-    quantity = 1,
-    selectedSize = null,
-    selectedColor = null
-  ) => {
-    const added = addToCart(
-      product,
-      quantity,
-      selectedSize,
-      selectedColor
-    );
-
-    if (added) {
-      removeFromWishlist(product.id);
-    }
-
-    return added;
-  };
-
-  /*
-   * RECENTLY VIEWED
-   */
-
-  const addRecentlyViewed = (product) => {
-    if (!product?.id) return;
-
-    setRecentlyViewed((current) => {
-      const withoutCurrent = current.filter(
-        (item) => item.id !== product.id
-      );
-
-      return [product, ...withoutCurrent].slice(0, 12);
-    });
-  };
-
-  const clearRecentlyViewed = () => {
-    setRecentlyViewed([]);
-  };
-
-  /*
-   * CART CALCULATIONS
-   */
-
-  const cartCount = useMemo(
-    () =>
-      cart.reduce(
-        (total, item) =>
-          total + Number(item.quantity || 0),
-        0
-      ),
-    [cart]
+  const moveWishlistToCart = useCallback(
+    (product, opts = {}) => {
+      const ok = addToCart(product, opts);
+      if (ok) setState((st) => ({ ...st, wishlist: st.wishlist.filter((x) => x !== product.id) }));
+      return ok;
+    },
+    [addToCart]
   );
 
-  const cartSubtotal = useMemo(
-    () =>
-      cart.reduce(
-        (total, item) =>
-          total +
-          Number(item.price || 0) *
-            Number(item.quantity || 0),
-        0
-      ),
-    [cart]
-  );
+  /* ---------- recently viewed ---------- */
 
-  const cartMrpTotal = useMemo(
-    () =>
-      cart.reduce(
-        (total, item) =>
-          total +
-          Number(
-            item.mrp ?? item.price ?? 0
-          ) *
-            Number(item.quantity || 0),
-        0
-      ),
-    [cart]
-  );
+  const addRecentlyViewed = useCallback((product) => {
+    if (!product) return;
+    setState((st) =>
+      st.recentlyViewed[0] === product.id ? st : { ...st, recentlyViewed: [product.id, ...st.recentlyViewed.filter((x) => x !== product.id)].slice(0, 16) }
+    );
+  }, []);
 
-  const productSavings = Math.max(
-    cartMrpTotal - cartSubtotal,
-    0
-  );
+  const clearRecentlyViewed = useCallback(() => setState((st) => ({ ...st, recentlyViewed: [] })), []);
 
-  const wishlistCount = wishlist.length;
+  /* ---------- pincode / coupon ---------- */
 
-  const contextValue = useMemo(
+  const setPincode = useCallback((pin, meta) => {
+    setState((st) => ({ ...st, pincode: pin ? { pincode: pin, ...meta } : null }));
+  }, []);
+
+  const applyCoupon = useCallback((code) => setState((st) => ({ ...st, appliedCoupon: code ? code.toUpperCase() : null })), []);
+
+  const value = useMemo(
     () => ({
-      /*
-       * State
-       */
       cart,
+      savedForLater,
       wishlist,
       recentlyViewed,
-
+      inventory,
+      pincode,
+      summary,
+      appliedCoupon,
+      userOrders,
+      usage,
+      cartCount: cart.reduce((t, i) => t + i.qty, 0),
+      wishlistCount: wishlist.length,
+      cartSubtotal: summary.itemTotal,
       cartOpen,
-      wishlistOpen,
-
-      /*
-       * Drawer controls
-       */
-      openCart: () => {
-        setWishlistOpen(false);
-        setCartOpen(true);
-      },
-
-      closeCart: () => {
-        setCartOpen(false);
-      },
-
-      openWishlist: () => {
-        setCartOpen(false);
-        setWishlistOpen(true);
-      },
-
-      closeWishlist: () => {
-        setWishlistOpen(false);
-      },
-
-      /*
-       * Cart
-       */
+      openCart: () => setCartOpen(true),
+      closeCart: () => setCartOpen(false),
+      quickViewId,
+      openQuickView: (id) => setQuickViewId(id),
+      closeQuickView: () => setQuickViewId(null),
+      pincodeOpen,
+      openPincode: () => setPincodeOpen(true),
+      closePincode: () => setPincodeOpen(false),
       addToCart,
-      updateCartQuantity,
-      incrementCartItem,
-      decrementCartItem,
+      buyNow,
+      updateQty,
+      changeVariant,
       removeFromCart,
+      saveForLater,
+      moveToCart,
+      removeSaved,
       clearCart,
-
-      /*
-       * Wishlist
-       */
-      toggleWishlist,
       isWishlisted,
-      removeFromWishlist,
+      toggleWishlist,
       moveWishlistToCart,
-
-      /*
-       * Recently viewed
-       */
+      removeFromWishlist: (id) => setState((st) => ({ ...st, wishlist: st.wishlist.filter((x) => x !== id) })),
       addRecentlyViewed,
       clearRecentlyViewed,
-
-      /*
-       * Derived values
-       */
-      cartCount,
-      cartSubtotal,
-      cartMrpTotal,
-      productSavings,
-      wishlistCount,
+      setPincode,
+      applyCoupon,
     }),
-    [
-      cart,
-      wishlist,
-      recentlyViewed,
-      cartOpen,
-      wishlistOpen,
-      cartCount,
-      cartSubtotal,
-      cartMrpTotal,
-      productSavings,
-      wishlistCount,
-    ]
+    [cart, savedForLater, wishlist, recentlyViewed, inventory, pincode, summary, appliedCoupon, userOrders, usage, cartOpen, quickViewId, pincodeOpen, addToCart, buyNow, updateQty, changeVariant, removeFromCart, saveForLater, moveToCart, removeSaved, clearCart, isWishlisted, toggleWishlist, moveWishlistToCart, addRecentlyViewed, clearRecentlyViewed, setPincode, applyCoupon]
   );
 
-  return (
-    <ShopContext.Provider value={contextValue}>
-      {children}
-    </ShopContext.Provider>
-  );
+  return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 }
 
 export function useShop() {
-  const context = useContext(ShopContext);
-
-  if (!context) {
-    throw new Error(
-      "useShop must be used inside ShopProvider"
-    );
-  }
-
-  return context;
-}
-
-function getCartKey(item) {
-  return [
-    item.id,
-    item.selectedSize || "default-size",
-    item.selectedColor || "default-color",
-  ].join("__");
+  const ctx = useContext(ShopContext);
+  if (!ctx) throw new Error("useShop must be used inside ShopProvider");
+  return ctx;
 }

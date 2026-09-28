@@ -1,417 +1,214 @@
 import { useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  ChevronDown,
-  ImagePlus,
-  Send,
-  Star,
-  ThumbsUp,
-  UserRound
-} from "lucide-react";
-import "./ProductReviews.css";
+import { Link } from "react-router-dom";
+import { BadgeCheck, Camera, MessageSquarePlus, Star, ThumbsUp } from "lucide-react";
+import { getReviews } from "../../data/reviews";
+import { useStore } from "../../lib/store";
+import { useCurrentUser } from "../../lib/services/account";
+import { addReview } from "../../lib/services/orders";
+import { compact, cx, formatDate } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { Img, Modal, RatingChip, SectionHead, Stars } from "../common/ui";
 
-const initialReviews = [
-  {
-    id: "review-001",
-    name: "Ananya Sharma",
-    rating: 5,
-    title: "Really good quality",
-    text: "The fabric feels premium and the fit is exactly what I expected. Delivery was also quick.",
-    date: "18 Sep 2026",
-    verified: true,
-    helpful: 34,
-    images: [],
-    size: "M"
-  },
-  {
-    id: "review-002",
-    name: "Riya Mehta",
-    rating: 4,
-    title: "Good for the price",
-    text: "Nice material and comfortable to wear. The colour looks very close to the product pictures.",
-    date: "12 Sep 2026",
-    verified: true,
-    helpful: 21,
-    images: [],
-    size: "S"
-  },
-  {
-    id: "review-003",
-    name: "Karan Verma",
-    rating: 5,
-    title: "Would buy again",
-    text: "Good quality, proper packaging and arrived before the expected delivery date.",
-    date: "07 Sep 2026",
-    verified: true,
-    helpful: 18,
-    images: [],
-    size: "L"
-  }
-];
-
-const ratingBreakdown = [
-  { rating: 5, count: 328 },
-  { rating: 4, count: 91 },
-  { rating: 3, count: 32 },
-  { rating: 2, count: 14 },
-  { rating: 1, count: 8 }
-];
-
-function RatingStars({ rating, size = 16 }) {
-  return (
-    <div className="review-stars">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          size={size}
-          fill={star <= rating ? "currentColor" : "none"}
-          strokeWidth={1.8}
-        />
-      ))}
-    </div>
-  );
-}
-
-function RatingBar({ rating, count, total }) {
-  const percentage = total ? (count / total) * 100 : 0;
-
-  return (
-    <div className="rating-bar-row">
-      <span>{rating}</span>
-      <Star size={12} fill="currentColor" />
-      <div className="rating-bar">
-        <span style={{ width: `${percentage}%` }} />
-      </div>
-      <small>{count}</small>
-    </div>
-  );
-}
-
-function ReviewCard({ review, onHelpful }) {
-  return (
-    <article className="review-card">
-      <div className="review-card-top">
-        <div className="review-user">
-          <div className="review-avatar">
-            <UserRound size={17} />
-          </div>
-
-          <div>
-            <strong>{review.name}</strong>
-
-            <div className="review-user-meta">
-              {review.verified && (
-                <span>
-                  <CheckCircle2 size={12} />
-                  Verified Purchase
-                </span>
-              )}
-
-              {review.size && <span>Size {review.size}</span>}
-            </div>
-          </div>
-        </div>
-
-        <span className="review-date">{review.date}</span>
-      </div>
-
-      <div className="review-card-rating">
-        <RatingStars rating={review.rating} size={14} />
-      </div>
-
-      <h3>{review.title}</h3>
-
-      <p>{review.text}</p>
-
-      {review.images?.length > 0 && (
-        <div className="review-images">
-          {review.images.map((image, index) => (
-            <img
-              src={image}
-              alt={`Customer review ${index + 1}`}
-              key={`${review.id}-${index}`}
-            />
-          ))}
-        </div>
-      )}
-
-      <button
-        className="review-helpful"
-        type="button"
-        onClick={() => onHelpful?.(review)}
-      >
-        <ThumbsUp size={14} />
-        Helpful
-        <span>{review.helpful}</span>
-      </button>
-    </article>
-  );
-}
-
-function ReviewForm({ onSubmit, onClose }) {
-  const [rating, setRating] = useState(0);
+export function ReviewForm({ product, open, onClose }) {
+  const user = useCurrentUser();
+  const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!rating) {
-      setError("Please select a rating.");
+  const [fit, setFit] = useState("true");
+  const submit = () => {
+    if (!text.trim() || text.trim().length < 10) {
+      toast.error("Please write at least 10 characters");
       return;
     }
-
-    if (!title.trim()) {
-      setError("Please add a review title.");
-      return;
-    }
-
-    if (!text.trim()) {
-      setError("Please write your review.");
-      return;
-    }
-
-    setError("");
-    setSubmitting(true);
-
-    try {
-      await onSubmit?.({
-        rating,
-        title: title.trim(),
-        text: text.trim(),
-        createdAt: new Date().toISOString()
-      });
-
-      setRating(0);
-      setTitle("");
-      setText("");
-    } finally {
-      setSubmitting(false);
-    }
+    addReview(product.id, { name: user?.name || "Customer", city: "India", rating, title: title || (rating >= 4 ? "Loved it" : "Honest review"), text, fit });
+    toast("Thanks! Your review is live 🎉");
+    onClose();
+    setText("");
+    setTitle("");
   };
-
   return (
-    <div className="review-form-card">
-      <div className="review-form-header">
-        <div>
-          <span>YOUR EXPERIENCE</span>
-          <h3>Write a review</h3>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Review ${product.name}`}
+      footer={
+        <>
+          <button className="btn btn-outline" onClick={onClose}>Cancel</button>
+          <button className="btn" onClick={submit}>Submit review</button>
+        </>
+      }
+    >
+      <div className="col gap-16">
+        <div className="col gap-6">
+          <span className="label">Your rating</span>
+          <Stars value={rating} onChange={setRating} size={28} />
         </div>
-
-        <button type="button" onClick={onClose}>
-          Close
+        {product.sizeChart ? (
+          <div className="col gap-6">
+            <span className="label">How was the fit?</span>
+            <div className="seg">
+              {[["small", "Runs small"], ["true", "True to size"], ["large", "Runs large"]].map(([v, l]) => (
+                <button key={v} type="button" className={cx(fit === v && "active")} onClick={() => setFit(v)}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <div className="field">
+          <label>Title</label>
+          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sum it up in a few words" maxLength={80} />
+        </div>
+        <div className="field">
+          <label>Your review</label>
+          <textarea className="textarea" value={text} onChange={(e) => setText(e.target.value)} placeholder="What did you like or dislike? How's the quality?" maxLength={1000} />
+        </div>
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => toast.info("Photo upload is available in the app")}>
+          <Camera size={15} /> Add photos
         </button>
       </div>
+    </Modal>
+  );
+}
 
-      <form onSubmit={handleSubmit}>
-        <div className="review-form-rating">
-          <span>Your rating</span>
+export default function ProductReviews({ product }) {
+  const user = useCurrentUser();
+  const userReviews = useStore((s) => s.userReviews);
+  const [sort, setSort] = useState("helpful");
+  const [filter, setFilter] = useState(0);
+  const [writing, setWriting] = useState(false);
+  const [helpful, setHelpful] = useState({});
+  const data = useMemo(() => getReviews(product), [product]);
+  const mine = userReviews[product.id] || [];
 
-          <div>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                type="button"
-                key={star}
-                className={star <= rating ? "active" : ""}
-                onClick={() => setRating(star)}
-                aria-label={`${star} stars`}
-              >
-                <Star
-                  size={27}
-                  fill={star <= rating ? "currentColor" : "none"}
-                />
+  const list = useMemo(() => {
+    let all = [...mine, ...data.list];
+    if (filter) all = all.filter((r) => r.rating === filter);
+    if (sort === "recent") all.sort((a, b) => b.date - a.date);
+    else if (sort === "high") all.sort((a, b) => b.rating - a.rating);
+    else if (sort === "low") all.sort((a, b) => a.rating - b.rating);
+    else all.sort((a, b) => b.helpful - a.helpful);
+    return all;
+  }, [data, mine, sort, filter]);
+
+  const total = data.distribution.reduce((a, b) => a + b, 0) || 1;
+  const photos = data.list.filter((r) => r.withPhoto);
+
+  return (
+    <section className="section" id="reviews">
+      <SectionHead
+        eyebrow={<><Star size={13} /> Ratings & reviews</>}
+        title="What customers are saying"
+        action={
+          user ? (
+            <button className="btn btn-outline btn-sm" onClick={() => setWriting(true)}>
+              <MessageSquarePlus size={15} /> Write a review
+            </button>
+          ) : (
+            <Link to="/login" className="btn btn-outline btn-sm">
+              Login to review
+            </Link>
+          )
+        }
+      />
+      <div className="reviews-grid">
+        <div className="card card-pad reviews-summary">
+          <div className="row gap-16">
+            <div className="big-rating">
+              {product.rating.toFixed(1)}
+              <Star size={26} fill="#12b76a" color="#12b76a" />
+            </div>
+            <div className="small muted">
+              {compact(product.ratingCount)} ratings &
+              <br />
+              {compact(product.reviewCount)} reviews
+            </div>
+          </div>
+          <div className="col gap-6 mt-16">
+            {[5, 4, 3, 2, 1].map((n, i) => (
+              <button key={n} className={cx("dist-row", filter === n && "active")} onClick={() => setFilter(filter === n ? 0 : n)}>
+                <span className="xs bold">{n}★</span>
+                <div className={cx("progress", n >= 4 ? "green" : n === 3 ? "" : "red")}>
+                  <span style={{ width: `${(data.distribution[i] / total) * 100}%` }} />
+                </div>
+                <span className="xs muted">{compact(data.distribution[i])}</span>
               </button>
             ))}
           </div>
+          {data.fit ? (
+            <div className="fit mt-16">
+              <span className="label">Size & fit</span>
+              <div className="fit-bar mt-8">
+                <span style={{ width: `${data.fit.small}%` }} title="Runs small" />
+                <span style={{ width: `${data.fit.true}%` }} title="True to size" />
+                <span style={{ width: `${data.fit.large}%` }} title="Runs large" />
+              </div>
+              <div className="row between xs muted mt-4">
+                <span>Small {data.fit.small}%</span>
+                <b className="text-green">True to size {data.fit.true}%</b>
+                <span>Large {data.fit.large}%</span>
+              </div>
+            </div>
+          ) : null}
+          {photos.length ? (
+            <div className="mt-16">
+              <span className="label">Customer photos</span>
+              <div className="review-photos mt-8">
+                {photos.map((r) => (
+                  <Img key={r.id} src={r.withPhoto} alt="" label="" />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
-        <label>
-          <span>Review title</span>
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Summarize your experience"
-            maxLength={80}
-          />
-        </label>
-
-        <label>
-          <span>Your review</span>
-          <textarea
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder="What did you like about the product?"
-            rows={5}
-            maxLength={500}
-          />
-          <small>{text.length}/500</small>
-        </label>
-
-        <button type="button" className="review-image-button">
-          <ImagePlus size={16} />
-          Add photos
-        </button>
-
-        {error && <div className="review-form-error">{error}</div>}
-
-        <div className="review-form-actions">
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-
-          <button type="submit" disabled={submitting}>
-            <Send size={15} />
-            {submitting ? "Submitting..." : "Submit review"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-export default function ProductReviews({
-  product,
-  reviews = initialReviews,
-  rating = 4.5,
-  reviewCount = 473,
-  canReview = true,
-  onSubmitReview,
-  onHelpful
-}) {
-  const [sort, setSort] = useState("Most Relevant");
-  const [showForm, setShowForm] = useState(false);
-
-  const sortedReviews = useMemo(() => {
-    const list = [...reviews];
-
-    if (sort === "Highest Rated") {
-      return list.sort((a, b) => b.rating - a.rating);
-    }
-
-    if (sort === "Lowest Rated") {
-      return list.sort((a, b) => a.rating - b.rating);
-    }
-
-    if (sort === "Newest") {
-      return list.reverse();
-    }
-
-    return list;
-  }, [reviews, sort]);
-
-  const totalRatings = ratingBreakdown.reduce(
-    (sum, item) => sum + item.count,
-    0
-  );
-
-  const handleSubmit = async (payload) => {
-    await onSubmitReview?.({
-      productId: product?.id,
-      ...payload
-    });
-
-    setShowForm(false);
-  };
-
-  return (
-    <section className="product-reviews">
-      <div className="reviews-heading">
-        <div>
-          <span>REAL CUSTOMER FEEDBACK</span>
-          <h2>Ratings & Reviews</h2>
-          <p>See what customers are saying about this product.</p>
-        </div>
-
-        {canReview && (
-          <button
-            className="write-review-button"
-            type="button"
-            onClick={() => setShowForm((value) => !value)}
-          >
-            <Star size={17} />
-            Write a review
-          </button>
-        )}
-      </div>
-
-      {showForm && (
-        <ReviewForm
-          onSubmit={handleSubmit}
-          onClose={() => setShowForm(false)}
-        />
-      )}
-
-      <div className="reviews-summary">
-        <div className="overall-rating">
-          <strong>{rating.toFixed(1)}</strong>
-          <RatingStars rating={Math.round(rating)} size={19} />
-          <span>{reviewCount.toLocaleString("en-IN")} ratings</span>
-        </div>
-
-        <div className="rating-breakdown">
-          {ratingBreakdown.map((item) => (
-            <RatingBar
-              key={item.rating}
-              rating={item.rating}
-              count={item.count}
-              total={totalRatings}
-            />
-          ))}
-        </div>
-
-        <div className="review-trust">
-          <CheckCircle2 size={22} />
-          <strong>Verified purchases</strong>
-          <span>
-            Reviews from customers who purchased this product through D2C Mall.
-          </span>
-        </div>
-      </div>
-
-      <div className="reviews-toolbar">
-        <div>
-          <strong>{reviews.length} reviews</strong>
-        </div>
-
-        <label className="review-sort">
-          <span>Sort by</span>
-          <select
-            value={sort}
-            onChange={(event) => setSort(event.target.value)}
-          >
-            <option>Most Relevant</option>
-            <option>Newest</option>
-            <option>Highest Rated</option>
-            <option>Lowest Rated</option>
-          </select>
-          <ChevronDown size={15} />
-        </label>
-      </div>
-
-      <div className="reviews-list">
-        {sortedReviews.length ? (
-          sortedReviews.map((review) => (
-            <ReviewCard
-              key={review.id}
-              review={review}
-              onHelpful={onHelpful}
-            />
-          ))
-        ) : (
-          <div className="reviews-empty">
-            <Star size={28} />
-            <h3>No reviews yet</h3>
-            <p>Be the first customer to review this product.</p>
-            {canReview && (
-              <button type="button" onClick={() => setShowForm(true)}>
-                Write the first review
-              </button>
-            )}
+        <div className="col gap-16">
+          <div className="row between wrap gap-16">
+            <div className="chips">
+              {[0, 5, 4, 3].map((n) => (
+                <button key={n} className={cx("chip", filter === n && "active")} onClick={() => setFilter(n)}>
+                  {n ? `${n}★` : "All"}
+                </button>
+              ))}
+            </div>
+            <select className="select" style={{ width: "auto" }} value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="helpful">Most helpful</option>
+              <option value="recent">Most recent</option>
+              <option value="high">Highest rated</option>
+              <option value="low">Lowest rated</option>
+            </select>
           </div>
-        )}
+          {list.length ? (
+            list.map((r) => (
+              <article key={r.id} className="review">
+                <div className="row gap-6">
+                  <RatingChip rating={r.rating} />
+                  <b className="small">{r.title}</b>
+                </div>
+                <p className="small mt-8">{r.text}</p>
+                {r.withPhoto ? <Img src={r.withPhoto} alt="" className="review-img mt-8" label="" /> : null}
+                <div className="row between wrap mt-12 xs muted">
+                  <span className="row gap-6">
+                    {r.name} · {r.city} · {formatDate(r.date)}
+                    {r.verified ? (
+                      <span className="row gap-4 text-green bold">
+                        <BadgeCheck size={13} /> Verified buyer
+                      </span>
+                    ) : null}
+                    {r.size ? <span>· Size {r.size}</span> : null}
+                  </span>
+                  <button className={cx("helpful", helpful[r.id] && "on")} onClick={() => setHelpful({ ...helpful, [r.id]: !helpful[r.id] })}>
+                    <ThumbsUp size={13} /> Helpful ({r.helpful + (helpful[r.id] ? 1 : 0)})
+                  </button>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="muted small">No reviews match this filter.</p>
+          )}
+        </div>
       </div>
+      <ReviewForm product={product} open={writing} onClose={() => setWriting(false)} />
     </section>
   );
 }
