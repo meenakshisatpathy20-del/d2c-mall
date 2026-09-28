@@ -1,968 +1,243 @@
-import { motion } from "framer-motion";
-import {
-  AlertTriangle,
-  ArrowDownRight,
-  ArrowUpRight,
-  BarChart3,
-  Bell,
-  Boxes,
-  ChevronRight,
-  CircleDollarSign,
-  ClipboardList,
-  Clock3,
-  Download,
-  Factory,
-  FileText,
-  LayoutDashboard,
-  LogOut,
-  MapPin,
-  Menu,
-  Package,
-  Percent,
-  RefreshCw,
-  Search,
-  Settings,
-  ShoppingBag,
-  Store,
-  Truck,
-  UserRound,
-  Users,
-  X,
-} from "lucide-react";
-import { useMemo, useState } from "react";
-import "./AdminDashboard.css";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, Boxes, CheckCircle2, CreditCard, IndianRupee, Package, RotateCcw, ShoppingCart, Store, Truck, XCircle } from "lucide-react";
+import { useStore } from "../../lib/store";
+import { productMap } from "../../data/catalog";
+import { warehouses } from "../../data/logistics";
+import { ORDER_STATUS, deriveOrderStatus, shipmentEvents } from "../../lib/orderModel";
+import { paymentMode } from "../../lib/services/payments";
+import { compact, formatDateTime, formatINR } from "../../lib/format";
+import { StatusPill } from "../common/ui";
+import { AdminHeader, BarChart, HBars, Kpi } from "./AdminBits";
 
-const NAV_ITEMS = [
-  {
-    id: "overview",
-    label: "Overview",
-    icon: LayoutDashboard,
-  },
-  {
-    id: "orders",
-    label: "Orders",
-    icon: ShoppingBag,
-  },
-  {
-    id: "inventory",
-    label: "Inventory",
-    icon: Boxes,
-  },
-  {
-    id: "warehouses",
-    label: "Warehouses",
-    icon: Factory,
-  },
-  {
-    id: "shipments",
-    label: "Shipments",
-    icon: Truck,
-  },
-  {
-    id: "customers",
-    label: "Customers",
-    icon: Users,
-  },
-  {
-    id: "returns",
-    label: "Returns",
-    icon: RefreshCw,
-  },
-  {
-    id: "franchise",
-    label: "Franchise",
-    icon: Store,
-  },
-];
+const DAY = 86400000;
 
-const KPI_DATA = [
-  {
-    label: "Orders today",
-    value: "1,284",
-    change: "+12.8%",
-    positive: true,
-    icon: ShoppingBag,
-  },
-  {
-    label: "Revenue today",
-    value: "₹8.42L",
-    change: "+18.4%",
-    positive: true,
-    icon: CircleDollarSign,
-  },
-  {
-    label: "AOV",
-    value: "₹1,847",
-    change: "+6.2%",
-    positive: true,
-    icon: BarChart3,
-  },
-  {
-    label: "Pending fulfilment",
-    value: "186",
-    change: "-9.1%",
-    positive: true,
-    icon: ClipboardList,
-  },
-];
-
-const ORDER_DATA = [
-  {
-    id: "D2C24092381",
-    customer: "Aarohi Sharma",
-    items: 2,
-    amount: 2398,
-    payment: "Paid",
-    status: "Shipped",
-    warehouse: "Bhiwandi",
-    time: "4 min ago",
-  },
-  {
-    id: "D2C24092380",
-    customer: "Rohan Mehta",
-    items: 1,
-    amount: 699,
-    payment: "Paid",
-    status: "Processing",
-    warehouse: "Delhi NCR",
-    time: "8 min ago",
-  },
-  {
-    id: "D2C24092379",
-    customer: "Ananya Singh",
-    items: 3,
-    amount: 3189,
-    payment: "Paid",
-    status: "Out for Delivery",
-    warehouse: "Bengaluru",
-    time: "13 min ago",
-  },
-  {
-    id: "D2C24092378",
-    customer: "Kabir Verma",
-    items: 1,
-    amount: 1499,
-    payment: "COD",
-    status: "Processing",
-    warehouse: "Jaipur",
-    time: "19 min ago",
-  },
-  {
-    id: "D2C24092377",
-    customer: "Meher Khan",
-    items: 2,
-    amount: 1648,
-    payment: "Paid",
-    status: "Delivered",
-    warehouse: "Delhi NCR",
-    time: "27 min ago",
-  },
-];
-
-const WAREHOUSE_DATA = [
-  {
-    name: "Bhiwandi",
-    city: "Mumbai",
-    orders: 438,
-    stock: "92%",
-    lowStock: 18,
-    status: "Healthy",
-  },
-  {
-    name: "Delhi NCR",
-    city: "Delhi",
-    orders: 392,
-    stock: "88%",
-    lowStock: 24,
-    status: "Healthy",
-  },
-  {
-    name: "Bengaluru",
-    city: "Bengaluru",
-    orders: 274,
-    stock: "76%",
-    lowStock: 31,
-    status: "Watch",
-  },
-  {
-    name: "Jaipur",
-    city: "Jaipur",
-    orders: 180,
-    stock: "69%",
-    lowStock: 43,
-    status: "Watch",
-  },
-];
-
-const LOW_STOCK = [
-  {
-    sku: "D2C-SHIRT-001",
-    product: "Relaxed Fit Cotton Shirt",
-    warehouse: "Bengaluru",
-    available: 4,
-    threshold: 10,
-  },
-  {
-    sku: "D2C-LAMP-001",
-    product: "Modern Accent Table Lamp",
-    warehouse: "Jaipur",
-    available: 6,
-    threshold: 12,
-  },
-  {
-    sku: "D2C-SNEAK-001",
-    product: "Everyday Street Sneakers",
-    warehouse: "Delhi NCR",
-    available: 8,
-    threshold: 15,
-  },
-];
-
-const FRANCHISE_DATA = [
-  {
-    name: "Arjun Retail Ventures",
-    city: "Ranchi",
-    model: "FOFO",
-    date: "23 Sep",
-    status: "New",
-  },
-  {
-    name: "Urban Commerce Pvt Ltd",
-    city: "Pune",
-    model: "FOCO",
-    date: "22 Sep",
-    status: "Review",
-  },
-  {
-    name: "NorthStar Retail",
-    city: "Delhi NCR",
-    model: "FOFO",
-    date: "21 Sep",
-    status: "Review",
-  },
-];
-
-function StatusBadge({
-  status,
-}) {
-  const className = status
-    .toLowerCase()
-    .replace(/\s+/g, "-");
-
-  return (
-    <span
-      className={`admin-status ${className}`}
-    >
-      <i />
-      {status}
-    </span>
-  );
+export function scopeOrders(orders, admin) {
+  if (!admin?.warehouseId) return orders;
+  return orders.filter((o) => o.shipments.some((s) => s.warehouseId === admin.warehouseId) || o.allocations?.some((a) => a.warehouseId === admin.warehouseId));
 }
 
-function KPICard({
-  item,
-}) {
-  const Icon = item.icon;
+export default function AdminDashboard({ admin }) {
+  const allOrders = useStore((s) => s.orders);
+  const inventory = useStore((s) => s.inventory);
+  const returns = useStore((s) => s.returns);
+  const apps = useStore((s) => s.franchiseApps);
+  const orders = useMemo(() => scopeOrders(allOrders, admin), [allOrders, admin]);
+  const now = Date.now();
+
+  const stats = useMemo(() => {
+    const live = orders.map((o) => ({ ...o, live: deriveOrderStatus(o, now) }));
+    const valid = live.filter((o) => !["cancelled", "payment_failed", "pending_payment"].includes(o.live));
+    const today = valid.filter((o) => now - o.createdAt < DAY);
+    const week = valid.filter((o) => now - o.createdAt < 7 * DAY);
+    const gmvWeek = week.reduce((t, o) => t + o.pricing.total, 0);
+    const byStatus = {};
+    live.forEach((o) => (byStatus[o.live] = (byStatus[o.live] || 0) + 1));
+    const series = Array.from({ length: 14 }, (_, i) => {
+      const start = new Date(now - (13 - i) * DAY);
+      start.setHours(0, 0, 0, 0);
+      const end = start.getTime() + DAY;
+      const count = valid.filter((o) => o.createdAt >= start.getTime() && o.createdAt < end).length;
+      return { label: start.toLocaleDateString("en-IN", { day: "numeric", month: "short" }), short: start.toLocaleDateString("en-IN", { day: "numeric" }), value: count };
+    });
+    const ndr = live.flatMap((o) => o.shipments.filter((s) => ["delivery_failed", "reattempt"].includes(shipmentEvents(s, now).slice(-1)[0]?.status))).length;
+    const pendingDispatch = live.filter((o) => ["confirmed", "processing"].includes(o.live)).length;
+    return { live, valid, today, week, gmvWeek, aov: week.length ? gmvWeek / week.length : 0, byStatus, series, ndr, pendingDispatch, failedPayments: live.filter((o) => o.live === "payment_failed").length };
+  }, [orders, now]);
+
+  const lowStock = useMemo(() => {
+    const rows = [];
+    Object.entries(inventory).forEach(([pid, whs]) =>
+      Object.entries(whs).forEach(([wid, r]) => {
+        if (admin.warehouseId && wid !== admin.warehouseId) return;
+        const sellable = r.available - r.reserved;
+        if (sellable <= r.threshold && r.available > 0) rows.push({ pid, wid, sellable, threshold: r.threshold });
+      })
+    );
+    return rows.sort((a, b) => a.sellable - b.sellable);
+  }, [inventory, admin]);
+
+  const whLoad = warehouses
+    .filter((w) => !admin.warehouseId || w.id === admin.warehouseId)
+    .map((w) => ({
+      label: w.short,
+      color: w.color,
+      value: stats.live.reduce((t, o) => t + o.shipments.filter((s) => s.warehouseId === w.id && !["delivered", "cancelled"].includes(shipmentEvents(s, now).slice(-1)[0]?.status)).length, 0),
+    }));
+
+  const statusRows = Object.entries(stats.byStatus)
+    .map(([k, v]) => ({ label: ORDER_STATUS[k]?.label || k, value: v }))
+    .sort((a, b) => b.value - a.value);
+
+  const topProducts = useMemo(() => {
+    const m = {};
+    stats.valid.forEach((o) => o.items.forEach((i) => (m[i.productId] = (m[i.productId] || 0) + i.qty)));
+    return Object.entries(m)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([pid, q]) => ({ p: productMap[pid], q }));
+  }, [stats.valid]);
 
   return (
-    <motion.article
-      className="admin-kpi-card"
-      whileHover={{ y: -2 }}
-    >
-      <div className="admin-kpi-top">
-        <span>{item.label}</span>
-
-        <div>
-          <Icon size={16} />
-        </div>
-      </div>
-
-      <strong>{item.value}</strong>
-
-      <span
-        className={
-          item.positive
-            ? "admin-change positive"
-            : "admin-change negative"
+    <div className="col gap-16">
+      <AdminHeader
+        eyebrow="Operations overview"
+        title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${admin.name.split(" ")[0]}`}
+        sub={admin.warehouseId ? "Showing data for your warehouse only" : "Live view across all warehouses, orders and channels"}
+        actions={
+          <>
+            <Link to="/admin/orders" className="btn btn-sm btn-blue">
+              <Package size={14} /> Manage orders
+            </Link>
+            <Link to="/admin/inventory" className="btn btn-sm btn-outline">
+              <Boxes size={14} /> Inventory
+            </Link>
+          </>
         }
-      >
-        {item.positive ? (
-          <ArrowUpRight size={12} />
-        ) : (
-          <ArrowDownRight size={12} />
-        )}
+      />
 
-        {item.change}
+      <div className="adm-kpis">
+        <Kpi icon={IndianRupee} label="GMV · last 7 days" value={formatINR(stats.gmvWeek)} delta={`${stats.week.length} orders`} tone="blue" />
+        <Kpi icon={ShoppingCart} label="Orders today" value={stats.today.length} delta={`AOV ${formatINR(stats.aov)}`} tone="orange" />
+        <Kpi icon={Package} label="Pending dispatch" value={stats.pendingDispatch} delta="Confirmed & processing" tone="purple" />
+        <Kpi icon={AlertTriangle} label="Delivery exceptions (NDR)" value={stats.ndr} delta="Failed attempts to action" tone="red" />
+        <Kpi icon={Boxes} label="Low-stock SKUs" value={lowStock.length} delta="At or below threshold" tone="amber" />
+        <Kpi icon={RotateCcw} label="Open returns" value={returns.filter((r) => !["refunded", "cancelled", "exchange_shipped"].includes(r.status)).length} delta="Pickup · QC · refund" tone="green" />
+      </div>
 
-        <small>
-          vs previous period
-        </small>
-      </span>
-    </motion.article>
-  );
-}
-
-function Overview({
-  onNavigate,
-}) {
-  const [query, setQuery] =
-    useState("");
-
-  const filteredOrders =
-    useMemo(() => {
-      if (!query.trim()) {
-        return ORDER_DATA;
-      }
-
-      const search =
-        query.toLowerCase();
-
-      return ORDER_DATA.filter(
-        (order) =>
-          `${order.id} ${order.customer} ${order.status} ${order.warehouse}`
-            .toLowerCase()
-            .includes(search)
-      );
-    }, [query]);
-
-  return (
-    <div className="admin-overview">
-      <div className="admin-page-title">
-        <div>
-          <span>OPERATIONS</span>
-          <h1>
-            Good evening, Admin.
-          </h1>
-          <p>
-            Here's what is happening across D2C Mall
-            today.
-          </p>
+      <div className="adm-grid-2">
+        <div className="card card-pad">
+          <div className="row between mb-16">
+            <b>Orders · last 14 days</b>
+            <span className="xs muted">Excludes cancelled & failed payments</span>
+          </div>
+          <BarChart data={stats.series} label="Orders per day over the last 14 days" />
         </div>
-
-        <div className="admin-title-actions">
-          <button type="button">
-            <Download size={14} />
-            Export
-          </button>
-
-          <button type="button">
-            <RefreshCw size={14} />
-            Refresh
-          </button>
+        <div className="card card-pad">
+          <b>Orders by status</b>
+          <div className="mt-16">
+            <HBars rows={statusRows} />
+          </div>
         </div>
       </div>
 
-      <section className="admin-kpi-grid">
-        {KPI_DATA.map((item) => (
-          <KPICard
-            key={item.label}
-            item={item}
-          />
-        ))}
-      </section>
-
-      <section className="admin-alert-strip">
-        <div>
-          <AlertTriangle size={17} />
-        </div>
-
-        <section>
-          <strong>
-            43 SKUs are below their stock
-            threshold.
-          </strong>
-
-          <span>
-            Jaipur and Bengaluru currently need the
-            most attention.
-          </span>
-        </section>
-
-        <button
-          type="button"
-          onClick={() =>
-            onNavigate?.("inventory")
-          }
-        >
-          Review inventory
-          <ChevronRight size={14} />
-        </button>
-      </section>
-
-      <div className="admin-dashboard-grid">
-        <section className="admin-panel admin-orders-panel">
-          <header className="admin-panel-header">
-            <div>
-              <span>LIVE ORDER FLOW</span>
-              <h2>Recent orders</h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onNavigate?.("orders")
-              }
-            >
-              View all
-              <ChevronRight size={13} />
-            </button>
-          </header>
-
-          <div className="admin-table-tools">
-            <div className="admin-table-search">
-              <Search size={14} />
-
-              <input
-                value={query}
-                onChange={(event) =>
-                  setQuery(
-                    event.target.value
-                  )
-                }
-                placeholder="Search order..."
-              />
-            </div>
+      <div className="adm-grid-3">
+        <div className="card card-pad">
+          <b>Active shipments by warehouse</b>
+          <div className="mt-16">
+            <HBars rows={whLoad} />
           </div>
+        </div>
+        <div className="card card-pad">
+          <div className="row between mb-16">
+            <b>Low-stock alerts</b>
+            <Link to="/admin/inventory?filter=low" className="link xs">View all</Link>
+          </div>
+          <div className="col gap-6">
+            {lowStock.slice(0, 6).map((r) => (
+              <div key={`${r.pid}-${r.wid}`} className="row gap-10 small">
+                <AlertTriangle size={14} className={r.sellable <= 2 ? "text-red" : "text-orange"} />
+                <span className="grow ellipsis">{productMap[r.pid]?.name}</span>
+                <span className="xs muted">{warehouses.find((w) => w.id === r.wid)?.short}</span>
+                <b className={r.sellable <= 2 ? "text-red" : "text-orange"}>{r.sellable}</b>
+              </div>
+            ))}
+            {!lowStock.length ? <p className="small muted">All SKUs above threshold 🎉</p> : null}
+          </div>
+        </div>
+        <div className="card card-pad">
+          <b>System status</b>
+          <div className="col gap-10 mt-16">
+            {[
+              ["Storefront", true, "Operational"],
+              ["Razorpay payments", true, paymentMode() === "live" ? "Live mode" : "Sandbox mode"],
+              ["Shiprocket logistics", true, "Polling every 10s"],
+              ["Notifications (Email/SMS/WA)", true, "Queued via API"],
+              ["Payment failures (24h)", stats.failedPayments < 3, `${stats.failedPayments} failed`],
+            ].map(([n, ok, s]) => (
+              <div key={n} className="row gap-10 small">
+                {ok ? <CheckCircle2 size={16} className="text-green" /> : <XCircle size={16} className="text-red" />}
+                <span className="grow">{n}</span>
+                <span className="xs muted">{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-          <div className="admin-table-scroll">
-            <table className="admin-table">
+      <div className="adm-grid-2">
+        <div className="card">
+          <div className="card-head">
+            <b>Recent orders</b>
+            <Link to="/admin/orders" className="link xs">All orders</Link>
+          </div>
+          <div className="table-wrap" style={{ border: 0, borderRadius: 0 }}>
+            <table className="table">
               <thead>
                 <tr>
-                  <th>ORDER</th>
-                  <th>CUSTOMER</th>
-                  <th>AMOUNT</th>
-                  <th>WAREHOUSE</th>
-                  <th>STATUS</th>
-                  <th>TIME</th>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Total</th>
+                  <th>Payment</th>
+                  <th>Status</th>
                 </tr>
               </thead>
-
               <tbody>
-                {filteredOrders.map(
-                  (order) => (
-                    <tr key={order.id}>
-                      <td>
-                        <strong>
-                          {order.id}
-                        </strong>
-                        <small>
-                          {order.items}{" "}
-                          {order.items === 1
-                            ? "item"
-                            : "items"}
-                        </small>
-                      </td>
-
-                      <td>
-                        {order.customer}
-                      </td>
-
-                      <td>
-                        ₹
-                        {order.amount.toLocaleString(
-                          "en-IN"
-                        )}
-                      </td>
-
-                      <td>
-                        {order.warehouse}
-                      </td>
-
-                      <td>
-                        <StatusBadge
-                          status={
-                            order.status
-                          }
-                        />
-                      </td>
-
-                      <td>
-                        <span className="admin-time">
-                          <Clock3
-                            size={11}
-                          />
-                          {order.time}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                )}
+                {stats.live.slice(0, 7).map((o) => (
+                  <tr key={o.id}>
+                    <td>
+                      <Link to={`/admin/orders?q=${o.id}`} className="link small">{o.id}</Link>
+                      <div className="xs muted">{formatDateTime(o.createdAt)}</div>
+                    </td>
+                    <td className="small">{o.customer}</td>
+                    <td className="small bold">{formatINR(o.pricing.total)}</td>
+                    <td className="xs">
+                      <CreditCard size={12} /> {o.payment.method.toUpperCase()}
+                    </td>
+                    <td>
+                      <StatusPill status={o.live} />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        </section>
-
-        <section className="admin-panel admin-warehouse-panel">
-          <header className="admin-panel-header">
-            <div>
-              <span>FULFILMENT NETWORK</span>
-              <h2>Warehouses</h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onNavigate?.(
-                  "warehouses"
-                )
-              }
-            >
-              Manage
-              <ChevronRight size={13} />
-            </button>
-          </header>
-
-          <div className="admin-warehouse-list">
-            {WAREHOUSE_DATA.map(
-              (warehouse) => (
-                <article
-                  key={warehouse.name}
-                >
-                  <div className="admin-warehouse-icon">
-                    <Factory size={16} />
-                  </div>
-
-                  <section>
-                    <strong>
-                      {warehouse.name}
-                    </strong>
-
-                    <span>
-                      {warehouse.city} ·{" "}
-                      {warehouse.orders} orders
-                    </span>
-                  </section>
-
-                  <div className="admin-stock-meter">
-                    <div>
-                      <span>
-                        Stock health
-                      </span>
-
-                      <strong>
-                        {warehouse.stock}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <i
-                        style={{
-                          width:
-                            warehouse.stock,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <StatusBadge
-                    status={
-                      warehouse.status
-                    }
-                  />
-                </article>
-              )
-            )}
-          </div>
-        </section>
-      </div>
-
-      <div className="admin-dashboard-grid lower">
-        <section className="admin-panel">
-          <header className="admin-panel-header">
-            <div>
-              <span>ATTENTION NEEDED</span>
-              <h2>Low stock</h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onNavigate?.("inventory")
-              }
-            >
-              Inventory
-              <ChevronRight size={13} />
-            </button>
-          </header>
-
-          <div className="admin-low-stock-list">
-            {LOW_STOCK.map(
-              (item) => (
-                <article key={item.sku}>
-                  <div>
-                    <strong>
-                      {item.product}
-                    </strong>
-
-                    <span>
-                      {item.sku} ·{" "}
-                      {item.warehouse}
-                    </span>
-                  </div>
-
-                  <div className="admin-stock-warning">
-                    <strong>
-                      {item.available}
-                    </strong>
-
-                    <span>
-                      left
-                    </span>
-                  </div>
-                </article>
-              )
-            )}
-          </div>
-        </section>
-
-        <section className="admin-panel">
-          <header className="admin-panel-header">
-            <div>
-              <span>NEW BUSINESS</span>
-              <h2>
-                Franchise enquiries
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                onNavigate?.(
-                  "franchise"
-                )
-              }
-            >
-              View all
-              <ChevronRight size={13} />
-            </button>
-          </header>
-
-          <div className="admin-franchise-list">
-            {FRANCHISE_DATA.map(
-              (application) => (
-                <article
-                  key={
-                    application.name
-                  }
-                >
-                  <div className="admin-franchise-avatar">
-                    {application.name[0]}
-                  </div>
-
-                  <div>
-                    <strong>
-                      {application.name}
-                    </strong>
-
-                    <span>
-                      {application.city} ·{" "}
-                      {application.model}
-                    </span>
-                  </div>
-
-                  <div>
-                    <StatusBadge
-                      status={
-                        application.status
-                      }
-                    />
-
-                    <small>
-                      {application.date}
-                    </small>
-                  </div>
-                </article>
-              )
-            )}
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function PlaceholderSection({
-  section,
-  onNavigate,
-}) {
-  const config = {
-    orders: {
-      label: "ORDER MANAGEMENT",
-      title: "Orders",
-      description:
-        "Search, filter and manage every customer order and fulfilment state.",
-      icon: ShoppingBag,
-    },
-    inventory: {
-      label: "INVENTORY CONTROL",
-      title: "Inventory",
-      description:
-        "Monitor SKU stock, reservations, low-stock thresholds and warehouse availability.",
-      icon: Boxes,
-    },
-    warehouses: {
-      label: "FULFILMENT NETWORK",
-      title: "Warehouses",
-      description:
-        "Manage warehouse capacity, stock distribution and fulfilment allocation.",
-      icon: Factory,
-    },
-    shipments: {
-      label: "LOGISTICS",
-      title: "Shipments",
-      description:
-        "Track AWB, carriers, shipment states and expected delivery.",
-      icon: Truck,
-    },
-    customers: {
-      label: "CUSTOMER MANAGEMENT",
-      title: "Customers",
-      description:
-        "Manage customer profiles, orders, lifetime value and support history.",
-      icon: Users,
-    },
-    returns: {
-      label: "RETURNS",
-      title: "Returns & Refunds",
-      description:
-        "Review return requests, refund status and reverse logistics.",
-      icon: RefreshCw,
-    },
-    franchise: {
-      label: "BUSINESS DEVELOPMENT",
-      title: "Franchise",
-      description:
-        "Review franchise applications, locations, models and application status.",
-      icon: Store,
-    },
-  };
-
-  const data = config[section];
-  const Icon = data.icon;
-
-  return (
-    <div className="admin-placeholder">
-      <div className="admin-placeholder-icon">
-        <Icon size={27} />
-      </div>
-
-      <span>{data.label}</span>
-
-      <h1>{data.title}</h1>
-
-      <p>{data.description}</p>
-
-      <div className="admin-placeholder-flow">
-        <div>
-          <ClipboardList size={15} />
-          Data
         </div>
-
-        <ChevronRight size={14} />
-
-        <div>
-          <Settings size={15} />
-          Operations
-        </div>
-
-        <ChevronRight size={14} />
-
-        <div>
-          <BarChart3 size={15} />
-          Analytics
-        </div>
-      </div>
-
-      <button
-        type="button"
-        onClick={() =>
-          onNavigate?.("overview")
-        }
-      >
-        Back to overview
-      </button>
-    </div>
-  );
-}
-
-export default function AdminDashboard({
-  onLogout,
-}) {
-  const [activeSection, setActiveSection] =
-    useState("overview");
-
-  const [mobileOpen, setMobileOpen] =
-    useState(false);
-
-  const currentLabel =
-    NAV_ITEMS.find(
-      (item) =>
-        item.id === activeSection
-    )?.label || "Overview";
-
-  const navigate = (section) => {
-    setActiveSection(section);
-    setMobileOpen(false);
-  };
-
-  return (
-    <main className="admin-dashboard">
-      <aside
-        className={`admin-sidebar ${
-          mobileOpen ? "open" : ""
-        }`}
-      >
-        <div className="admin-sidebar-brand">
-          <div>
-            <Store size={18} />
-          </div>
-
-          <section>
-            <strong>D2C MALL</strong>
-            <span>OPERATIONS</span>
-          </section>
-
-          <button
-            type="button"
-            onClick={() =>
-              setMobileOpen(false)
-            }
-          >
-            <X size={17} />
-          </button>
-        </div>
-
-        <nav className="admin-nav">
-          <span>COMMAND CENTER</span>
-
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <button
-                type="button"
-                key={item.id}
-                className={
-                  activeSection ===
-                  item.id
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  navigate(item.id)
-                }
-              >
-                <Icon size={16} />
-
-                <span>
-                  {item.label}
-                </span>
-
-                {item.id ===
-                  "orders" && (
-                  <em>24</em>
-                )}
-
-                {item.id ===
-                  "inventory" && (
-                  <em className="warning">
-                    43
-                  </em>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="admin-sidebar-bottom">
-          <button type="button">
-            <FileText size={15} />
-            Reports
-          </button>
-
-          <button type="button">
-            <Settings size={15} />
-            Settings
-          </button>
-
-          <button
-            type="button"
-            onClick={onLogout}
-          >
-            <LogOut size={15} />
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      {mobileOpen && (
-        <button
-          type="button"
-          className="admin-mobile-backdrop"
-          onClick={() =>
-            setMobileOpen(false)
-          }
-        />
-      )}
-
-      <section className="admin-main">
-        <header className="admin-topbar">
-          <div className="admin-topbar-left">
-            <button
-              type="button"
-              className="admin-mobile-menu"
-              onClick={() =>
-                setMobileOpen(true)
-              }
-            >
-              <Menu size={19} />
-            </button>
-
-            <div>
-              <span>OPERATIONS</span>
-              <strong>
-                {currentLabel}
-              </strong>
+        <div className="col gap-16">
+          <div className="card card-pad">
+            <b>Top products (units)</b>
+            <div className="col gap-10 mt-12">
+              {topProducts.map(({ p, q }, i) => (
+                <div key={p.id} className="row gap-10 small">
+                  <b className="faint" style={{ width: 16 }}>{i + 1}</b>
+                  <span className="grow ellipsis">{p.name}</span>
+                  <span className="xs muted">{p.brand}</span>
+                  <b>{q}</b>
+                </div>
+              ))}
             </div>
           </div>
-
-          <div className="admin-topbar-right">
-            <button type="button">
-              <Bell size={17} />
-              <i />
-            </button>
-
-            <div className="admin-user">
-              <div>
-                AR
+          {admin.permissions.includes("franchise") ? (
+            <Link to="/admin/franchise" className="card card-pad row gap-10">
+              <Store size={20} className="text-orange" />
+              <div className="grow">
+                <b className="small">Franchise pipeline</b>
+                <div className="xs muted">
+                  {apps.filter((a) => a.status === "submitted").length} new · {apps.filter((a) => a.status === "site_verification").length} site visits · {apps.filter((a) => a.status === "approved").length} approved
+                </div>
               </div>
-
-              <span>
-                <strong>Admin</strong>
-                <small>
-                  Super Admin
-                </small>
-              </span>
+              <span className="xs link">Review →</span>
+            </Link>
+          ) : null}
+          <div className="card card-pad row gap-10">
+            <Truck size={20} className="text-blue" />
+            <div className="grow">
+              <b className="small">Customers served</b>
+              <div className="xs muted">{compact(new Set(orders.map((o) => o.userId)).size)} customers · {compact(orders.length)} orders in system</div>
             </div>
           </div>
-        </header>
-
-        <div className="admin-content">
-          {activeSection ===
-          "overview" ? (
-            <Overview
-              onNavigate={navigate}
-            />
-          ) : (
-            <PlaceholderSection
-              section={
-                activeSection
-              }
-              onNavigate={navigate}
-            />
-          )}
         </div>
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }

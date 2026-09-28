@@ -8,6 +8,7 @@ import { addReview } from "../../lib/services/orders";
 import { compact, cx, formatDate } from "../../lib/format";
 import { toast } from "../../lib/toast";
 import { Img, Modal, RatingChip, SectionHead, Stars } from "../common/ui";
+import "./ProductReviews.css";
 
 export function ReviewForm({ product, open, onClose }) {
   const user = useCurrentUser();
