@@ -629,3 +629,15 @@
     overflow-x: auto;
   }
 }
+
+/* ---------- WebGL map containers (shared) ---------- */
+
+.globe-wrap,
+.globe-fallback {
+  position: absolute;
+  inset: 0;
+}
+
+.globe-fallback {
+  background: radial-gradient(circle at 50% 50%, rgba(36, 87, 255, 0.35), transparent 60%);
+}

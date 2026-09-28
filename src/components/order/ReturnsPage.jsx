@@ -1,812 +1,308 @@
 import { useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  Package,
-  RotateCcw,
-  Search,
-  ShieldCheck,
-  Truck,
-  XCircle
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { Banknote, Calendar, Check, CreditCard, MapPin, Package, Repeat, RotateCcw, Wallet, XCircle } from "lucide-react";
+import { useStore } from "../../lib/store";
+import { useCurrentUser } from "../../lib/services/account";
+import { deliveredAt, deriveOrderStatus } from "../../lib/orderModel";
+import { RETURN_LABEL, cancelReturn, requestReturn, returnEvents, returnStatus, returnWindowOpen } from "../../lib/services/orders";
+import { useNow } from "../../lib/services/liveSync";
+import { cx, formatDate, formatDateTime, formatINR } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { Breadcrumbs, Empty, Img, useDocumentTitle } from "../common/ui";
 import "./ReturnsPage.css";
 
-const initialReturns = [
-  {
-    id: "RET-20260918001",
-    orderId: "D2C-20260915042",
-    product: {
-      id: "d2c-women-001",
-      name: "Relaxed Fit Cotton Shirt",
-      brand: "D2C Studio",
-      image: "https://images.unsplash.com/photo-1603252110481-7ba873bf42ab?auto=format&fit=crop&w=500&q=80",
-      price: 899,
-      qty: 1
-    },
-    reason: "Size/Fit Issue",
-    description: "The size is larger than expected.",
-    pickupAddress: {
-      name: "Priyank Raj",
-      phone: "9876543210",
-      address: "12 Main Road",
-      city: "Bengaluru",
-      state: "Karnataka",
-      pincode: "560001"
-    },
-    pickupDate: "28 Sep 2026",
-    refundMethod: "Original Payment Method",
-    refundAmount: 899,
-    status: "Pickup Scheduled",
-    createdAt: "25 Sep 2026",
-    timeline: [
-      {
-        title: "Return requested",
-        date: "25 Sep 2026, 10:42 AM",
-        status: "completed",
-        description: "Your return request has been received."
-      },
-      {
-        title: "Return approved",
-        date: "25 Sep 2026, 11:08 AM",
-        status: "completed",
-        description: "The return request was approved."
-      },
-      {
-        title: "Pickup scheduled",
-        date: "28 Sep 2026",
-        status: "current",
-        description: "Our courier partner will collect the product."
-      },
-      {
-        title: "Quality check",
-        date: "Pending",
-        status: "pending",
-        description: "The returned item will be inspected."
-      },
-      {
-        title: "Refund initiated",
-        date: "Pending",
-        status: "pending",
-        description: "Refund will be initiated after successful quality verification."
-      }
-    ]
-  },
-  {
-    id: "RET-20260912007",
-    orderId: "D2C-20260910019",
-    product: {
-      id: "d2c-footwear-001",
-      name: "Everyday Street Sneakers",
-      brand: "StreetForm",
-      image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80",
-      price: 1499,
-      qty: 1
-    },
-    reason: "Product Not as Expected",
-    description: "The product appearance differs from expectations.",
-    pickupAddress: {
-      name: "Priyank Raj",
-      phone: "9876543210",
-      address: "12 Main Road",
-      city: "Bengaluru",
-      state: "Karnataka",
-      pincode: "560001"
-    },
-    pickupDate: "Completed",
-    refundMethod: "D2C Wallet",
-    refundAmount: 1499,
-    status: "Refund Processing",
-    createdAt: "12 Sep 2026",
-    timeline: [
-      {
-        title: "Return requested",
-        date: "12 Sep 2026",
-        status: "completed",
-        description: "Your return request was received."
-      },
-      {
-        title: "Pickup completed",
-        date: "15 Sep 2026",
-        status: "completed",
-        description: "Product was successfully collected."
-      },
-      {
-        title: "Quality check",
-        date: "17 Sep 2026",
-        status: "completed",
-        description: "Product passed the return quality check."
-      },
-      {
-        title: "Refund initiated",
-        date: "18 Sep 2026",
-        status: "current",
-        description: "Refund is being processed."
-      },
-      {
-        title: "Refund completed",
-        date: "Expected 29 Sep 2026",
-        status: "pending",
-        description: "Refund will be credited to your selected method."
-      }
-    ]
-  },
-  {
-    id: "RET-20260901003",
-    orderId: "D2C-20260829081",
-    product: {
-      id: "d2c-beauty-001",
-      name: "Hydrating Glow Face Serum",
-      brand: "GlowLab",
-      image: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&w=500&q=80",
-      price: 549,
-      qty: 1
-    },
-    reason: "Damaged Product",
-    description: "The package arrived damaged.",
-    pickupAddress: {
-      name: "Priyank Raj",
-      phone: "9876543210",
-      address: "12 Main Road",
-      city: "Bengaluru",
-      state: "Karnataka",
-      pincode: "560001"
-    },
-    pickupDate: "05 Sep 2026",
-    refundMethod: "Original Payment Method",
-    refundAmount: 549,
-    status: "Refund Completed",
-    createdAt: "01 Sep 2026",
-    timeline: [
-      {
-        title: "Return requested",
-        date: "01 Sep 2026",
-        status: "completed",
-        description: "Your return request was received."
-      },
-      {
-        title: "Pickup completed",
-        date: "05 Sep 2026",
-        status: "completed",
-        description: "Product was successfully collected."
-      },
-      {
-        title: "Quality check",
-        date: "07 Sep 2026",
-        status: "completed",
-        description: "Return quality verification was completed."
-      },
-      {
-        title: "Refund initiated",
-        date: "08 Sep 2026",
-        status: "completed",
-        description: "Refund was initiated."
-      },
-      {
-        title: "Refund completed",
-        date: "09 Sep 2026",
-        status: "completed",
-        description: "Refund was successfully credited."
-      }
-    ]
-  }
+const REASONS = [
+  "Size too small",
+  "Size too large",
+  "Product damaged / defective",
+  "Received wrong item",
+  "Quality not as expected",
+  "Colour different from image",
+  "Changed my mind",
 ];
 
-const returnReasons = [
-  "Size/Fit Issue",
-  "Wrong Product",
-  "Damaged Product",
-  "Defective Product",
-  "Product Not as Expected",
-  "Quality Issue",
-  "Missing Item",
-  "Other"
-];
+const FLOW = ["requested", "approved", "pickup_scheduled", "picked_up", "qc_passed", "refund_initiated", "refunded"];
 
-const statusConfig = {
-  "Pickup Scheduled": {
-    icon: Truck,
-    className: "scheduled"
-  },
-  "Refund Processing": {
-    icon: Clock3,
-    className: "processing"
-  },
-  "Refund Completed": {
-    icon: CheckCircle2,
-    className: "completed"
-  },
-  Cancelled: {
-    icon: XCircle,
-    className: "cancelled"
+function slots() {
+  const out = [];
+  for (let d = 1; d <= 3; d += 1) {
+    const date = new Date();
+    date.setDate(date.getDate() + d);
+    const label = d === 1 ? "Tomorrow" : date.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+    out.push(`${label}, 9 AM – 1 PM`, `${label}, 2 PM – 7 PM`);
   }
-};
-
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0
-  }).format(value);
-
-function ReturnStatus({ status }) {
-  const config = statusConfig[status] || statusConfig["Pickup Scheduled"];
-  const Icon = config.icon;
-
-  return (
-    <span className={`returns-status ${config.className}`}>
-      <Icon size={14} />
-      {status}
-    </span>
-  );
+  return out;
 }
 
-function ReturnTimeline({ timeline }) {
-  return (
-    <div className="returns-timeline">
-      {timeline.map((item, index) => (
-        <div
-          className={`returns-timeline-item ${item.status}`}
-          key={`${item.title}-${index}`}
-        >
-          <div className="returns-timeline-marker">
-            {item.status === "completed" ? (
-              <CheckCircle2 size={16} />
-            ) : item.status === "current" ? (
-              <Clock3 size={16} />
-            ) : (
-              <span />
-            )}
-          </div>
+function NewReturn({ user, orders, onDone }) {
+  const [params] = useSearchParams();
+  const now = useNow(10000);
+  const returns = useStore((s) => s.returns);
+  const eligibleOrders = orders.filter((o) => deriveOrderStatus(o, now) === "delivered");
+  const [orderId, setOrderId] = useState(params.get("order") || eligibleOrders[0]?.id || "");
+  const order = orders.find((o) => o.id === orderId);
+  const dAt = order ? deliveredAt(order, now) : null;
+  const eligibleLines = order
+    ? order.items.filter((i) => returnWindowOpen(order, i, dAt) && !returns.some((r) => r.lineIds.includes(i.lineId) && r.status !== "cancelled"))
+    : [];
+  const [lines, setLines] = useState(() => (params.get("line") ? [params.get("line")] : []));
+  const [type, setType] = useState("return");
+  const [reason, setReason] = useState(REASONS[0]);
+  const [comment, setComment] = useState("");
+  const [slot, setSlot] = useState(slots()[0]);
+  const [refund, setRefund] = useState("original");
+  const [addressId, setAddressId] = useState(user.addresses.find((a) => a.pincode === order?.address.pincode)?.id || user.addresses[0]?.id);
 
-          <div className="returns-timeline-content">
-            <div className="returns-timeline-top">
-              <strong>{item.title}</strong>
-              <span>{item.date}</span>
+  const chosen = eligibleLines.filter((i) => lines.includes(i.lineId));
+  const amount = chosen.reduce((t, i) => t + i.price * i.qty, 0);
+
+  const submit = () => {
+    if (!chosen.length) return toast.error("Select at least one item");
+    requestReturn({ order, lineIds: chosen.map((i) => i.lineId), reason, comment, type, pickupSlot: slot, refundMethod: refund, userId: user.id });
+    toast(type === "exchange" ? "Exchange requested — pickup scheduled" : "Return requested — pickup scheduled");
+    onDone();
+  };
+
+  if (!eligibleOrders.length)
+    return <Empty icon={<RotateCcw size={34} />} title="No delivered orders to return" text="Items can be returned within their return window after delivery." action={<Link to="/orders" className="btn">My orders</Link>} />;
+
+  return (
+    <div className="ret-form">
+      <section className="card card-pad">
+        <b className="ret-step">1. Select order & items</b>
+        <select className="select mt-12" value={orderId} onChange={(e) => { setOrderId(e.target.value); setLines([]); }}>
+          {eligibleOrders.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.id} · delivered · {o.items.length} item(s) · {formatINR(o.pricing.total)}
+            </option>
+          ))}
+        </select>
+        <div className="col gap-10 mt-12">
+          {order?.items.map((i) => {
+            const eligible = eligibleLines.includes(i);
+            return (
+              <label key={i.lineId} className={cx("radio-card", lines.includes(i.lineId) && "active", !eligible && "disabled-card")}>
+                <input type="checkbox" disabled={!eligible} checked={lines.includes(i.lineId)} onChange={() => setLines(lines.includes(i.lineId) ? lines.filter((x) => x !== i.lineId) : [...lines, i.lineId])} />
+                <Img src={i.image} alt="" className="ret-img" label="" />
+                <div className="grow">
+                  <b className="small">{i.brand}</b>
+                  <div className="xs muted">{i.name}</div>
+                  <div className="xs faint">{[i.size && `Size ${i.size}`, `Qty ${i.qty}`].filter(Boolean).join(" · ")}</div>
+                  {!eligible ? <span className="xs text-red">{i.returnDays ? "Return window closed or already requested" : "Non-returnable item"}</span> : <span className="xs text-green">Returnable till {formatDate(dAt + i.returnDays * 86400000)}</span>}
+                </div>
+                <b className="small">{formatINR(i.price * i.qty)}</b>
+              </label>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="card card-pad">
+        <b className="ret-step">2. Return or exchange?</b>
+        <div className="grid grid-2 mt-12">
+          <label className={cx("radio-card", type === "return" && "active")}>
+            <input type="radio" checked={type === "return"} onChange={() => setType("return")} />
+            <div>
+              <b className="small row gap-6"><RotateCcw size={15} /> Return for refund</b>
+              <p className="xs muted">Get your money back after pickup & quality check</p>
             </div>
-            <p>{item.description}</p>
+          </label>
+          <label className={cx("radio-card", type === "exchange" && "active")}>
+            <input type="radio" checked={type === "exchange"} onChange={() => setType("exchange")} />
+            <div>
+              <b className="small row gap-6"><Repeat size={15} /> Exchange size</b>
+              <p className="xs muted">We'll ship the new size as soon as it's picked up</p>
+            </div>
+          </label>
+        </div>
+        <div className="field mt-16">
+          <label>Reason</label>
+          <div className="chips" style={{ flexWrap: "wrap" }}>
+            {REASONS.map((r) => (
+              <button key={r} type="button" className={cx("chip", reason === r && "active")} onClick={() => setReason(r)}>
+                {r}
+              </button>
+            ))}
           </div>
         </div>
-      ))}
+        <div className="field mt-16">
+          <label>Additional comments (optional)</label>
+          <textarea className="textarea" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Tell us more so we can improve" />
+        </div>
+      </section>
+
+      <section className="card card-pad">
+        <b className="ret-step">3. Pickup</b>
+        <div className="grid grid-2 mt-12">
+          <div className="field">
+            <label className="row gap-6"><MapPin size={14} /> Pickup address</label>
+            <select className="select" value={addressId} onChange={(e) => setAddressId(e.target.value)}>
+              {user.addresses.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label || a.type} · {a.line1}, {a.city} {a.pincode}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label className="row gap-6"><Calendar size={14} /> Pickup slot</label>
+            <select className="select" value={slot} onChange={(e) => setSlot(e.target.value)}>
+              {slots().map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p className="xs muted mt-8">Keep the item unused with original tags and packaging. Our courier partner will verify the item at pickup.</p>
+      </section>
+
+      {type === "return" ? (
+        <section className="card card-pad">
+          <b className="ret-step">4. Refund method</b>
+          <div className="col gap-10 mt-12">
+            {[
+              ["original", CreditCard, "Original payment method", order?.payment.method === "cod" ? "Not available for COD orders" : `${order?.payment.instrument} · 3–5 working days`, order?.payment.method === "cod"],
+              ["credits", Wallet, "D2C Mall credits", "Instant after pickup · use on your next order", false],
+              ["bank", Banknote, "Bank account (NEFT/IMPS)", "Add account details · 2–3 working days", false],
+            ].map(([id, Icon, t, s, disabled]) => (
+              <label key={id} className={cx("radio-card", refund === id && "active", disabled && "disabled-card")}>
+                <input type="radio" disabled={disabled} checked={refund === id} onChange={() => setRefund(id)} />
+                <Icon size={18} className="text-blue" />
+                <div>
+                  <b className="small">{t}</b>
+                  <p className="xs muted">{s}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="ret-submit">
+        <div>
+          <span className="xs muted">{chosen.length} item(s) selected</span>
+          <b style={{ display: "block", fontSize: 18 }}>{type === "exchange" ? "Free exchange" : `Refund ${formatINR(amount)}`}</b>
+        </div>
+        <button className="btn btn-lg" onClick={submit} disabled={!chosen.length}>
+          Confirm {type}
+        </button>
+      </div>
     </div>
   );
 }
 
-function ReturnCard({ item, onOpen }) {
-  return (
-    <article className="return-card">
-      <div className="return-card-header">
-        <div>
-          <span className="return-label">Return ID</span>
-          <strong>{item.id}</strong>
-        </div>
-
-        <ReturnStatus status={item.status} />
-      </div>
-
-      <div className="return-card-product">
-        <img src={item.product.image} alt={item.product.name} />
-
-        <div className="return-product-info">
-          <span>{item.product.brand}</span>
-          <h3>{item.product.name}</h3>
-          <p>Order {item.orderId}</p>
-          <strong>{formatCurrency(item.refundAmount)}</strong>
-        </div>
-
-        <button
-          className="return-view-button"
-          type="button"
-          onClick={() => onOpen(item)}
-        >
-          View details
-          <ChevronRight size={17} />
-        </button>
-      </div>
-
-      <div className="return-card-meta">
-        <div>
-          <span>Reason</span>
-          <strong>{item.reason}</strong>
-        </div>
-
-        <div>
-          <span>Pickup</span>
-          <strong>{item.pickupDate}</strong>
-        </div>
-
-        <div>
-          <span>Refund</span>
-          <strong>{formatCurrency(item.refundAmount)}</strong>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function ReturnRequest({ onSubmit, onBack }) {
-  const [selectedProduct, setSelectedProduct] = useState(initialReturns[0].product);
-  const [reason, setReason] = useState("");
-  const [description, setDescription] = useState("");
-  const [refundMethod, setRefundMethod] = useState("Original Payment Method");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!reason) {
-      setError("Please select a return reason.");
-      return;
-    }
-
-    setError("");
-    setSubmitting(true);
-
-    const payload = {
-      product: selectedProduct,
-      reason,
-      description,
-      refundMethod,
-      requestedAt: new Date().toISOString()
-    };
-
-    try {
-      await onSubmit?.(payload);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+export default function ReturnsPage() {
+  useDocumentTitle("Returns & refunds");
+  const user = useCurrentUser();
+  const all = useStore((s) => s.returns);
+  const orders = useStore((s) => s.orders);
+  const now = useNow(4000);
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState(params.get("order") ? "new" : "list");
+  const mine = useMemo(() => all.filter((r) => r.userId === user.id), [all, user.id]);
+  const myOrders = useMemo(() => orders.filter((o) => o.userId === user.id), [orders, user.id]);
 
   return (
-    <section className="return-request-page">
-      <div className="return-request-header">
-        <button type="button" onClick={onBack}>
-          <ArrowLeft size={18} />
-          Back
-        </button>
-
-        <div>
-          <span>ORDER SUPPORT</span>
-          <h1>Return a product</h1>
-          <p>Tell us what went wrong and we’ll guide you through the return.</p>
-        </div>
-      </div>
-
-      <form className="return-request-layout" onSubmit={handleSubmit}>
-        <div className="return-request-main">
-          <div className="return-form-section">
-            <div className="return-section-heading">
-              <span>01</span>
-              <div>
-                <h2>Select product</h2>
-                <p>Choose the item you want to return.</p>
-              </div>
-            </div>
-
-            <div className="return-product-selector">
-              {initialReturns.map((item) => {
-                const active = selectedProduct.id === item.product.id;
-
-                return (
-                  <button
-                    className={`return-product-option ${active ? "active" : ""}`}
-                    type="button"
-                    key={item.product.id}
-                    onClick={() => setSelectedProduct(item.product)}
-                  >
-                    <img src={item.product.image} alt={item.product.name} />
-
-                    <span>
-                      <strong>{item.product.name}</strong>
-                      <small>{item.product.brand}</small>
-                      <b>{formatCurrency(item.product.price)}</b>
-                    </span>
-
-                    <span className="return-radio">
-                      {active && <span />}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="return-form-section">
-            <div className="return-section-heading">
-              <span>02</span>
-              <div>
-                <h2>Why are you returning it?</h2>
-                <p>Select the reason that best describes the issue.</p>
-              </div>
-            </div>
-
-            <div className="return-reason-grid">
-              {returnReasons.map((item) => (
-                <button
-                  className={reason === item ? "active" : ""}
-                  type="button"
-                  key={item}
-                  onClick={() => setReason(item)}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-
-            <label className="return-field">
-              <span>Additional details</span>
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Tell us anything else we should know..."
-                rows={5}
-                maxLength={500}
-              />
-              <small>{description.length}/500</small>
-            </label>
-          </div>
-
-          <div className="return-form-section">
-            <div className="return-section-heading">
-              <span>03</span>
-              <div>
-                <h2>Refund method</h2>
-                <p>Choose where you want your refund to be credited.</p>
-              </div>
-            </div>
-
-            <div className="refund-method-grid">
-              {[
-                {
-                  title: "Original Payment Method",
-                  description: "Refund to the payment method used for this order."
-                },
-                {
-                  title: "D2C Wallet",
-                  description: "Get the refund in your D2C wallet."
-                }
-              ].map((method) => {
-                const active = refundMethod === method.title;
-
-                return (
-                  <button
-                    type="button"
-                    className={`refund-method ${active ? "active" : ""}`}
-                    key={method.title}
-                    onClick={() => setRefundMethod(method.title)}
-                  >
-                    <span className="refund-method-radio">
-                      {active && <span />}
-                    </span>
-
-                    <span>
-                      <strong>{method.title}</strong>
-                      <small>{method.description}</small>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {error && <div className="return-form-error">{error}</div>}
-
-          <button
-            className="submit-return-button"
-            type="submit"
-            disabled={submitting}
-          >
-            {submitting ? "Submitting..." : "Submit return request"}
-            <ChevronRight size={18} />
-          </button>
-        </div>
-
-        <aside className="return-request-sidebar">
-          <div className="return-policy-card">
-            <ShieldCheck size={22} />
-            <h3>Easy returns</h3>
-            <p>
-              Return eligibility, pickup availability and refund timing will
-              be checked against your order.
-            </p>
-          </div>
-
-          <div className="return-summary-card">
-            <span>RETURN SUMMARY</span>
-
-            <img
-              src={selectedProduct.image}
-              alt={selectedProduct.name}
-            />
-
-            <h3>{selectedProduct.name}</h3>
-            <p>{selectedProduct.brand}</p>
-
-            <div>
-              <span>Refund amount</span>
-              <strong>{formatCurrency(selectedProduct.price)}</strong>
-            </div>
-
-            <div>
-              <span>Refund method</span>
-              <strong>{refundMethod}</strong>
-            </div>
-          </div>
-        </aside>
-      </form>
-    </section>
-  );
-}
-
-export default function ReturnsPage({
-  returns = initialReturns,
-  loading = false,
-  onSubmitReturn,
-  onCancelReturn,
-  onOpenReturn,
-  onBack
-}) {
-  const navigate = useNavigate();
-  const [activeReturn, setActiveReturn] = useState(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [showRequest, setShowRequest] = useState(false);
-
-  const safeReturns = Array.isArray(returns) ? returns : initialReturns;
-
-  const filteredReturns = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return safeReturns.filter((item) => {
-      const matchesStatus =
-        statusFilter === "All" || item.status === statusFilter;
-
-      const matchesSearch =
-        !query ||
-        item.id.toLowerCase().includes(query) ||
-        item.orderId.toLowerCase().includes(query) ||
-        item.product.name.toLowerCase().includes(query) ||
-        item.product.brand.toLowerCase().includes(query);
-
-      return matchesStatus && matchesSearch;
-    });
-  }, [safeReturns, search, statusFilter]);
-
-  const handleOpen = (item) => {
-    setActiveReturn(item);
-    onOpenReturn?.(item);
-  };
-
-  const handleSubmit = async (payload) => {
-    await onSubmitReturn?.(payload);
-    setShowRequest(false);
-  };
-
-  if (showRequest) {
-    return (
-      <ReturnRequest
-        onSubmit={handleSubmit}
-        onBack={() => setShowRequest(false)}
-      />
-    );
-  }
-
-  if (activeReturn) {
-    return (
-      <section className="return-details-page">
-        <div className="return-details-header">
-          <button type="button" onClick={() => setActiveReturn(null)}>
-            <ArrowLeft size={18} />
-            Back to returns
-          </button>
-
+    <div className="page">
+      <div className="container">
+        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Account", to: "/account" }, { label: "Returns & refunds" }]} />
+        <div className="row between wrap gap-16 mb-16">
           <div>
-            <span>RETURN DETAILS</span>
-            <h1>{activeReturn.id}</h1>
-            <p>Order {activeReturn.orderId}</p>
+            <h1 style={{ fontSize: 26, fontWeight: 800 }}>Returns & refunds</h1>
+            <p className="small muted">Doorstep pickup · refund after quality check · exchange for a different size</p>
           </div>
-
-          <ReturnStatus status={activeReturn.status} />
-        </div>
-
-        <div className="return-details-layout">
-          <main>
-            <div className="return-detail-product">
-              <img
-                src={activeReturn.product.image}
-                alt={activeReturn.product.name}
-              />
-
-              <div>
-                <span>{activeReturn.product.brand}</span>
-                <h2>{activeReturn.product.name}</h2>
-                <p>Return reason: {activeReturn.reason}</p>
-                <strong>{formatCurrency(activeReturn.refundAmount)}</strong>
-              </div>
-            </div>
-
-            <div className="return-detail-section">
-              <div className="return-detail-heading">
-                <Package size={19} />
-                <div>
-                  <h2>Return progress</h2>
-                  <p>Track every step of your return.</p>
-                </div>
-              </div>
-
-              <ReturnTimeline timeline={activeReturn.timeline} />
-            </div>
-
-            <div className="return-detail-section">
-              <div className="return-detail-heading">
-                <Truck size={19} />
-                <div>
-                  <h2>Pickup information</h2>
-                  <p>Details for the return pickup.</p>
-                </div>
-              </div>
-
-              <div className="return-info-grid">
-                <div>
-                  <span>Pickup date</span>
-                  <strong>{activeReturn.pickupDate}</strong>
-                </div>
-
-                <div>
-                  <span>Phone</span>
-                  <strong>{activeReturn.pickupAddress.phone}</strong>
-                </div>
-
-                <div className="full">
-                  <span>Pickup address</span>
-                  <strong>
-                    {activeReturn.pickupAddress.name},{" "}
-                    {activeReturn.pickupAddress.address},{" "}
-                    {activeReturn.pickupAddress.city},{" "}
-                    {activeReturn.pickupAddress.state} -{" "}
-                    {activeReturn.pickupAddress.pincode}
-                  </strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="return-detail-section">
-              <div className="return-detail-heading">
-                <RotateCcw size={19} />
-                <div>
-                  <h2>Refund information</h2>
-                  <p>How your refund will be processed.</p>
-                </div>
-              </div>
-
-              <div className="return-info-grid">
-                <div>
-                  <span>Refund amount</span>
-                  <strong>{formatCurrency(activeReturn.refundAmount)}</strong>
-                </div>
-
-                <div>
-                  <span>Refund method</span>
-                  <strong>{activeReturn.refundMethod}</strong>
-                </div>
-              </div>
-            </div>
-          </main>
-
-          <aside className="return-details-sidebar">
-            <div className="return-help-card">
-              <ShieldCheck size={22} />
-              <h3>Need help?</h3>
-              <p>
-                If something looks incorrect with your return, our support
-                team can help.
-              </p>
-
-              <button type="button" onClick={() => navigate("/account")}>
-                Contact support
-              </button>
-            </div>
-
-            {activeReturn.status !== "Refund Completed" &&
-              activeReturn.status !== "Cancelled" && (
-                <button
-                  className="cancel-return-button"
-                  type="button"
-                  onClick={() => onCancelReturn?.(activeReturn)}
-                >
-                  Cancel return request
-                </button>
-              )}
-          </aside>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="returns-page">
-      <div className="returns-page-header">
-        <div>
-          <span>MY ORDERS</span>
-          <h1>Returns & Refunds</h1>
-          <p>Track your return requests and refund progress.</p>
-        </div>
-
-        <button
-          className="new-return-button"
-          type="button"
-          onClick={() => setShowRequest(true)}
-        >
-          <RotateCcw size={18} />
-          Start a return
-        </button>
-      </div>
-
-      <div className="returns-toolbar">
-        <div className="returns-search">
-          <Search size={18} />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search return or order ID"
-          />
-        </div>
-
-        <div className="returns-filters">
-          {[
-            "All",
-            "Pickup Scheduled",
-            "Refund Processing",
-            "Refund Completed",
-            "Cancelled"
-          ].map((status) => (
-            <button
-              type="button"
-              className={statusFilter === status ? "active" : ""}
-              key={status}
-              onClick={() => setStatusFilter(status)}
-            >
-              {status}
+          <div className="seg">
+            <button className={cx(tab === "list" && "active")} onClick={() => setTab("list")}>
+              My returns ({mine.length})
             </button>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="returns-loading">
-          <div />
-          <div />
-          <div />
-        </div>
-      ) : filteredReturns.length ? (
-        <div className="returns-list">
-          {filteredReturns.map((item) => (
-            <ReturnCard
-              key={item.id}
-              item={item}
-              onOpen={handleOpen}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="returns-empty">
-          <div className="returns-empty-icon">
-            <RotateCcw size={28} />
+            <button className={cx(tab === "new" && "active")} onClick={() => setTab("new")}>
+              + New return
+            </button>
           </div>
-          <h2>No returns found</h2>
-          <p>
-            {search
-              ? "Try a different return ID, order ID or product."
-              : "Your return requests will appear here."}
-          </p>
-          <button type="button" onClick={() => setShowRequest(true)}>
-            Start a return
-          </button>
         </div>
-      )}
-    </section>
+
+        {tab === "new" ? (
+          <NewReturn user={user} orders={myOrders} onDone={() => setTab("list")} />
+        ) : mine.length ? (
+          <div className="col gap-16">
+            {mine.map((r) => {
+              const order = orders.find((o) => o.id === r.orderId);
+              const items = order?.items.filter((i) => r.lineIds.includes(i.lineId)) || [];
+              const st = returnStatus(r, now);
+              const idx = FLOW.indexOf(st === "exchange_shipped" ? "refund_initiated" : st);
+              const cancellable = ["requested", "approved", "pickup_scheduled"].includes(st);
+              return (
+                <article key={r.id} className="ret-card">
+                  <header className="row between wrap gap-10">
+                    <div>
+                      <b>
+                        {r.type === "exchange" ? "Exchange" : "Return"} #{r.id}
+                      </b>
+                      <div className="xs muted">
+                        Order {r.orderId} · requested {formatDateTime(r.createdAt)} · {r.reason}
+                      </div>
+                    </div>
+                    <span className={cx("badge", st === "cancelled" ? "badge-soft-gray" : st === "refunded" || st === "exchange_shipped" ? "badge-soft-green" : "badge-soft-amber")}>{RETURN_LABEL[st]}</span>
+                  </header>
+                  <div className="row gap-10 wrap mt-12">
+                    {items.map((i) => (
+                      <div key={i.lineId} className="row gap-10">
+                        <Img src={i.image} alt="" className="ret-img" label="" />
+                        <span className="xs">
+                          <b>{i.brand}</b>
+                          <span className="muted" style={{ display: "block" }}>{i.name}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {st !== "cancelled" ? (
+                    <div className="ret-flow">
+                      {FLOW.filter((f) => !(r.type === "exchange" && f === "refunded")).map((f, i) => (
+                        <div key={f} className={cx("ret-flow-step", i < idx && "done", i === idx && "current")}>
+                          <span>{i < idx || (i === idx && ["refunded", "exchange_shipped"].includes(st)) ? <Check size={11} /> : null}</span>
+                          <em>{r.type === "exchange" && f === "refund_initiated" ? "Replacement shipped" : RETURN_LABEL[f].replace("Return ", "")}</em>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="grid grid-3 mt-12 ret-meta">
+                    <div>
+                      <span className="xs muted">Pickup</span>
+                      <b className="small">{r.pickupSlot}</b>
+                    </div>
+                    <div>
+                      <span className="xs muted">{r.type === "exchange" ? "Exchange" : "Refund"}</span>
+                      <b className="small">{r.type === "exchange" ? "New size ships after pickup" : `${formatINR(r.refundAmount)} → ${r.refundMethod === "credits" ? "D2C credits" : r.refundMethod === "bank" ? "Bank account" : "Original method"}`}</b>
+                    </div>
+                    <div>
+                      <span className="xs muted">Latest update</span>
+                      <b className="small">{returnEvents(r, now).slice(-1)[0]?.note}</b>
+                    </div>
+                  </div>
+                  <div className="row gap-6 mt-12">
+                    {cancellable ? (
+                      <button
+                        className="btn btn-sm btn-ghost text-red"
+                        onClick={() => {
+                          const res = cancelReturn(r.id);
+                          res.ok ? toast("Return cancelled") : toast.error(res.error);
+                        }}
+                      >
+                        <XCircle size={14} /> Cancel return
+                      </button>
+                    ) : null}
+                    <Link to={`/orders/${r.orderId}`} className="btn btn-sm btn-outline">
+                      <Package size={14} /> View order
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <Empty icon={<RotateCcw size={34} />} title="No returns yet" text="Return or exchange delivered items within their return window." action={<button className="btn" onClick={() => setTab("new")}>Start a return</button>} />
+        )}
+      </div>
+    </div>
   );
 }

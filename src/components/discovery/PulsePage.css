@@ -68,16 +68,6 @@
   height: 400px;
 }
 
-.globe-wrap,
-.globe-fallback {
-  position: absolute;
-  inset: 0;
-}
-
-.globe-fallback {
-  background: radial-gradient(circle at 50% 50%, rgba(36, 87, 255, 0.35), transparent 60%);
-}
-
 .globe-legend {
   position: absolute;
   right: 20px;
