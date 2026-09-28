@@ -1,555 +1,122 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  Pause,
-  Play,
-  Sparkles,
-  Zap,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { heroBanners } from "../../data/catalog";
+import { ArrowRight, BadgeCheck, ChevronLeft, ChevronRight, MousePointerClick, Sparkles, Truck } from "lucide-react";
+import { getTrendingProducts, heroBanners } from "../../data/catalog";
+import { DiscoveryScene } from "../common/ThreeSafe";
+import { cx } from "../../lib/format";
 import "./HeroShowcase.css";
 
-const AUTO_PLAY_MS = 5500;
+const THEMES = {
+  navy: "linear-gradient(120deg, rgba(7,19,47,0.96) 0%, rgba(19,39,85,0.9) 48%, rgba(36,87,255,0.55) 100%)",
+  purple: "linear-gradient(120deg, rgba(27,15,61,0.96) 0%, rgba(62,28,150,0.88) 50%, rgba(238,70,188,0.45) 100%)",
+  orange: "linear-gradient(120deg, rgba(40,14,0,0.95) 0%, rgba(122,46,0,0.88) 50%, rgba(255,107,0,0.55) 100%)",
+};
 
-function getInitialIndex(banners) {
-  if (!Array.isArray(banners) || banners.length === 0) {
-    return 0;
-  }
-
-  const activeIndex = banners.findIndex(
-    (banner) =>
-      banner?.active !== false &&
-      (!banner?.startsAt ||
-        new Date(banner.startsAt) <= new Date()) &&
-      (!banner?.endsAt ||
-        new Date(banner.endsAt) >= new Date())
-  );
-
-  return activeIndex >= 0 ? activeIndex : 0;
-}
-
-function isBannerVisible(banner) {
-  if (!banner || banner.active === false) {
-    return false;
-  }
-
-  const now = Date.now();
-
-  if (
-    banner.startsAt &&
-    new Date(banner.startsAt).getTime() > now
-  ) {
-    return false;
-  }
-
-  if (
-    banner.endsAt &&
-    new Date(banner.endsAt).getTime() < now
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-function resolveImage(banner) {
-  return (
-    banner?.desktopImage ||
-    banner?.image ||
-    banner?.imageUrl ||
-    banner?.media?.desktop ||
-    banner?.media?.url ||
-    ""
-  );
-}
-
-function resolveMobileImage(banner) {
-  return (
-    banner?.mobileImage ||
-    banner?.mobileImageUrl ||
-    banner?.media?.mobile ||
-    resolveImage(banner)
-  );
-}
-
-export default function HeroShowcase({
-  banners,
-  loading = false,
-  onBannerClick,
-  onCtaClick,
-}) {
-  const sourceBanners =
-    banners?.length > 0 ? banners : heroBanners;
-
-  const visibleBanners = useMemo(
-    () => sourceBanners.filter(isBannerVisible),
-    [sourceBanners]
-  );
-
-  const [activeIndex, setActiveIndex] = useState(() =>
-    getInitialIndex(visibleBanners)
-  );
-
-  const [isPaused, setIsPaused] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+export default function HeroShowcase() {
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const navigate = useNavigate();
+  const banner = heroBanners[i];
+  const trending = getTrendingProducts();
 
   useEffect(() => {
-    setActiveIndex((current) => {
-      if (visibleBanners.length === 0) {
-        return 0;
-      }
-
-      return Math.min(
-        current,
-        visibleBanners.length - 1
-      );
-    });
-  }, [visibleBanners.length]);
-
-  useEffect(() => {
-    setImageLoaded(false);
-  }, [activeIndex]);
-
-  useEffect(() => {
-    if (
-      isPaused ||
-      visibleBanners.length <= 1
-    ) {
-      return undefined;
-    }
-
-    const timer = window.setInterval(() => {
-      setActiveIndex(
-        (current) =>
-          (current + 1) % visibleBanners.length
-      );
-    }, AUTO_PLAY_MS);
-
-    return () => window.clearInterval(timer);
-  }, [isPaused, visibleBanners.length]);
-
-  const currentBanner =
-    visibleBanners[activeIndex];
-
-  const goNext = () => {
-    if (!visibleBanners.length) {
-      return;
-    }
-
-    setActiveIndex(
-      (current) =>
-        (current + 1) % visibleBanners.length
-    );
-
-    setIsPaused(true);
-  };
-
-  const goPrevious = () => {
-    if (!visibleBanners.length) {
-      return;
-    }
-
-    setActiveIndex(
-      (current) =>
-        (current -
-          1 +
-          visibleBanners.length) %
-        visibleBanners.length
-    );
-
-    setIsPaused(true);
-  };
-
-  const handleBannerClick = () => {
-    if (!currentBanner) {
-      return;
-    }
-
-    if (onBannerClick) {
-      onBannerClick(currentBanner);
-      return;
-    }
-
-    if (currentBanner.href) {
-      window.location.href =
-        currentBanner.href;
-    }
-  };
-
-  const handleCtaClick = (event, cta) => {
-    event.stopPropagation();
-
-    if (onCtaClick) {
-      onCtaClick(cta, currentBanner);
-      return;
-    }
-
-    if (cta?.href) {
-      window.location.href = cta.href;
-    }
-  };
-
-  if (loading) {
-    return (
-      <section className="hero-showcase hero-showcase-loading">
-        <div className="hero-loading-shimmer" />
-
-        <div className="hero-loading-content">
-          <div className="hero-loading-line hero-loading-small" />
-          <div className="hero-loading-line hero-loading-large" />
-          <div className="hero-loading-line hero-loading-medium" />
-          <div className="hero-loading-button" />
-        </div>
-      </section>
-    );
-  }
-
-  if (!currentBanner) {
-    return (
-      <section className="hero-showcase hero-showcase-empty">
-        <div className="hero-empty-icon">
-          <Sparkles size={24} />
-        </div>
-
-        <div>
-          <strong>Fresh drops are loading</strong>
-          <span>
-            New campaigns will appear here.
-          </span>
-        </div>
-      </section>
-    );
-  }
-
-  const image = resolveImage(currentBanner);
-  const mobileImage =
-    resolveMobileImage(currentBanner);
-
-  const ctas = Array.isArray(
-    currentBanner.ctas
-  )
-    ? currentBanner.ctas.filter(Boolean)
-    : currentBanner.cta
-      ? [currentBanner.cta]
-      : [];
+    if (paused) return undefined;
+    const t = setInterval(() => setI((x) => (x + 1) % heroBanners.length), 6500);
+    return () => clearInterval(t);
+  }, [paused]);
 
   return (
-    <section
-      className="hero-showcase"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-      onFocus={() => setIsPaused(true)}
-      onBlur={() => setIsPaused(false)}
-    >
-      <AnimatePresence mode="wait">
-        <motion.article
-          key={
-            currentBanner.id ||
-            currentBanner._id ||
-            activeIndex
-          }
-          className="hero-slide"
-          initial={{
-            opacity: 0,
-            scale: 1.025,
-          }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-          }}
-          exit={{
-            opacity: 0,
-            scale: 0.985,
-          }}
-          transition={{
-            duration: 0.45,
-            ease: "easeOut",
-          }}
-          onClick={handleBannerClick}
-        >
-          <div className="hero-background">
-            {image ? (
-              <picture>
-                <source
-                  media="(max-width: 700px)"
-                  srcSet={mobileImage}
-                />
-
-                <img
-                  src={image}
-                  alt={
-                    currentBanner.alt ||
-                    currentBanner.title ||
-                    ""
-                  }
-                  className={`hero-image ${
-                    imageLoaded
-                      ? "hero-image-loaded"
-                      : ""
-                  }`}
-                  onLoad={() =>
-                    setImageLoaded(true)
-                  }
-                  draggable="false"
-                />
-              </picture>
-            ) : (
-              <div
-                className="hero-generated-background"
-                style={{
-                  background:
-                    currentBanner.background ||
-                    "linear-gradient(115deg, #07132f, #2457ff, #ff6b00)",
-                }}
-              />
-            )}
-
-            <div className="hero-overlay" />
-            <div className="hero-glow hero-glow-one" />
-            <div className="hero-glow hero-glow-two" />
-          </div>
-
-          <div className="hero-content">
-            <div className="hero-content-inner">
-              {currentBanner.eyebrow && (
-                <motion.div
-                  className="hero-eyebrow"
-                  initial={{
-                    opacity: 0,
-                    y: 12,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.1,
-                  }}
-                >
-                  <Zap
-                    size={13}
-                    fill="currentColor"
-                  />
-                  {currentBanner.eyebrow}
-                </motion.div>
-              )}
-
-              {currentBanner.title && (
-                <motion.h1
-                  initial={{
-                    opacity: 0,
-                    y: 18,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.16,
-                  }}
-                >
-                  {currentBanner.title}
-                </motion.h1>
-              )}
-
-              {currentBanner.subtitle && (
-                <motion.p
-                  initial={{
-                    opacity: 0,
-                    y: 16,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.22,
-                  }}
-                >
-                  {currentBanner.subtitle}
-                </motion.p>
-              )}
-
-              {ctas.length > 0 && (
-                <motion.div
-                  className="hero-ctas"
-                  initial={{
-                    opacity: 0,
-                    y: 15,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.28,
-                  }}
-                >
-                  {ctas.map((cta, index) => (
-                    <button
-                      key={
-                        cta.id ||
-                        `${cta.label}-${index}`
-                      }
-                      type="button"
-                      className={`hero-cta ${
-                        cta.variant ===
-                        "secondary"
-                          ? "hero-cta-secondary"
-                          : "hero-cta-primary"
-                      }`}
-                      onClick={(event) =>
-                        handleCtaClick(
-                          event,
-                          cta
-                        )
-                      }
-                    >
-                      {cta.icon ===
-                        "sparkle" && (
-                        <Sparkles size={16} />
-                      )}
-
-                      <span>
-                        {cta.label}
-                      </span>
-
-                      <ArrowRight size={16} />
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-
-              {currentBanner.microcopy && (
-                <motion.div
-                  className="hero-microcopy"
-                  initial={{
-                    opacity: 0,
-                  }}
-                  animate={{
-                    opacity: 1,
-                  }}
-                  transition={{
-                    delay: 0.34,
-                  }}
-                >
-                  {currentBanner.microcopy}
-                </motion.div>
-              )}
-            </div>
-          </div>
-
-          {currentBanner.badge && (
-            <motion.div
-              className="hero-floating-badge"
-              initial={{
-                opacity: 0,
-                x: 18,
-                scale: 0.9,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-                scale: 1,
-              }}
-              transition={{
-                delay: 0.3,
-              }}
-            >
-              <Sparkles size={14} />
-              <span>
-                {currentBanner.badge}
-              </span>
-            </motion.div>
-          )}
-        </motion.article>
+    <section className="hero" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <AnimatePresence mode="sync">
+        <motion.div
+          key={banner.id}
+          className="hero-bg"
+          initial={{ opacity: 0, scale: 1.06 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.9 }}
+          style={{ backgroundImage: `${THEMES[banner.theme]}, url(${banner.image})` }}
+        />
       </AnimatePresence>
+      <div className="hero-glow" />
 
-      {visibleBanners.length > 1 && (
-        <>
-          <button
-            type="button"
-            className="hero-arrow hero-arrow-left"
-            aria-label="Previous banner"
-            onClick={(event) => {
-              event.stopPropagation();
-              goPrevious();
-            }}
-          >
-            <ChevronLeft size={21} />
-          </button>
-
-          <button
-            type="button"
-            className="hero-arrow hero-arrow-right"
-            aria-label="Next banner"
-            onClick={(event) => {
-              event.stopPropagation();
-              goNext();
-            }}
-          >
-            <ChevronRight size={21} />
-          </button>
-
-          <div className="hero-controls">
-            <div className="hero-dots">
-              {visibleBanners.map(
-                (banner, index) => (
-                  <button
-                    key={
-                      banner.id ||
-                      banner._id ||
-                      index
-                    }
-                    type="button"
-                    className={`hero-dot ${
-                      index ===
-                      activeIndex
-                        ? "active"
-                        : ""
-                    }`}
-                    aria-label={`Go to banner ${
-                      index + 1
-                    }`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setActiveIndex(index);
-                      setIsPaused(true);
-                    }}
-                  >
-                    <span />
-                  </button>
-                )
-              )}
-            </div>
-
-            <button
-              type="button"
-              className="hero-play-toggle"
-              aria-label={
-                isPaused
-                  ? "Resume banners"
-                  : "Pause banners"
-              }
-              onClick={(event) => {
-                event.stopPropagation();
-                setIsPaused(
-                  (current) => !current
-                );
-              }}
+      <div className="hero-grid">
+        <div className="hero-copy">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={banner.id}
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.45 }}
             >
-              {isPaused ? (
-                <Play size={13} />
-              ) : (
-                <Pause size={13} />
-              )}
-            </button>
+              <span className="hero-eyebrow">
+                <Sparkles size={14} /> {banner.eyebrow}
+              </span>
+              <h1>
+                {banner.title}
+                <span className="hero-highlight">{banner.highlight}</span>
+              </h1>
+              <p>{banner.subtitle}</p>
+              <div className="hero-ctas">
+                {banner.ctas.map((c) => (
+                  <Link key={c.label} to={c.href} className={cx("btn btn-lg", c.variant === "glass" ? "btn-glass" : "")}>
+                    {c.label} {c.variant ? null : <ArrowRight size={18} />}
+                  </Link>
+                ))}
+              </div>
+              <div className="hero-stats">
+                {banner.stats.map(([v, l]) => (
+                  <div key={l}>
+                    <b>{v}</b>
+                    <span>{l}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="hero-foot">
+            <div className="hero-dots">
+              {heroBanners.map((b, idx) => (
+                <button key={b.id} className={cx(idx === i && "active")} onClick={() => setI(idx)} aria-label={`Show ${b.eyebrow}`}>
+                  <span style={idx === i && !paused ? { animationDuration: "6.5s" } : undefined} />
+                </button>
+              ))}
+            </div>
+            <div className="row gap-6">
+              <button className="hero-arrow" onClick={() => setI((i - 1 + heroBanners.length) % heroBanners.length)} aria-label="Previous">
+                <ChevronLeft size={18} />
+              </button>
+              <button className="hero-arrow" onClick={() => setI((i + 1) % heroBanners.length)} aria-label="Next">
+                <ChevronRight size={18} />
+              </button>
+            </div>
           </div>
-        </>
-      )}
+        </div>
+
+        <div className="hero-3d">
+          <div className="hero-3d-tag">
+            <MousePointerClick size={14} /> Drag to explore · click a product
+          </div>
+          <DiscoveryScene products={trending} onSelect={(p) => navigate(`/product/${p.id}`)} />
+          <div className="hero-floating hero-floating-a">
+            <BadgeCheck size={16} />
+            <div>
+              <b>240+ verified brands</b>
+              <span>Onboarded directly</span>
+            </div>
+          </div>
+          <div className="hero-floating hero-floating-b">
+            <Truck size={16} />
+            <div>
+              <b>24h express</b>
+              <span>From 4 hubs</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
