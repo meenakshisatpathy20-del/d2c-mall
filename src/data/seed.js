@@ -7,6 +7,7 @@ import { warehouses } from "./logistics";
 import { hashPassword } from "../lib/crypto";
 import { buildShipment, newInvoiceNo } from "../lib/orderModel";
 import { computeSummary } from "../lib/pricing";
+import { seedFranchiseApps } from "./franchise";
 
 const DAY = 86400000;
 const HOUR = 3600000;
@@ -272,9 +273,9 @@ export function createSeedState() {
       { id: "n4", userId: demoUserId, type: "refund", title: "Refund credited", body: "₹1,499 for your return RET26091201 has been credited to your bank account.", link: "/returns", at: now - 8 * DAY, read: true, channels: ["email", "sms"] },
     ],
     couponUsage: {},
-    social: { likes: {}, saves: {}, follows: { "cr-aarohi": true }, comments: {} },
+    social: { likes: {}, saves: {}, follows: { "cr-aarohi": true }, comments: {}, userPosts: [] },
     userReviews: {},
-    franchiseApps: [],
+    franchiseApps: seedFranchiseApps(),
     tickets: [
       { id: "TKT-10231", userId: demoUserId, orderId: "OD26092409917", subject: "Delivery attempt failed but I was home", status: "open", createdAt: now - DAY, messages: [{ from: "customer", text: "The courier marked not reachable but I was home all day.", at: now - DAY }, { from: "support", text: "Sorry about that! We've escalated to Delhivery and scheduled a priority re-attempt for today.", at: now - DAY + 2 * HOUR }] },
     ],

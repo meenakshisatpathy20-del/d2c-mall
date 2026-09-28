@@ -1,564 +1,305 @@
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  BarChart3,
-  CheckCircle2,
+  BadgeCheck,
+  Building2,
+  Calculator,
+  Check,
   ChevronDown,
-  ChevronRight,
+  ClipboardCheck,
+  FileSignature,
+  Handshake,
   MapPin,
-  ShieldCheck,
+  PhoneCall,
+  Rocket,
+  Search,
   Store,
   TrendingUp,
-  Users,
-  Wallet,
+  Warehouse,
 } from "lucide-react";
-import { useState } from "react";
+import { APPLICATION_STAGES, franchiseCities, franchiseFaq, franchiseModels, franchiseTiers } from "../../data/franchise";
+import { warehouses } from "../../data/logistics";
+import { cx, formatINR } from "../../lib/format";
+import { Breadcrumbs, useDocumentTitle } from "../common/ui";
 import "./FranchisePage.css";
 
-const opportunities = [
-  {
-    city: "Mumbai",
-    state: "Maharashtra",
-    model: "FOFO",
-    investment: "₹15L – ₹30L",
-    area: "800 – 1500 sq.ft.",
-    demand: "High",
-  },
-  {
-    city: "Bengaluru",
-    state: "Karnataka",
-    model: "FOCO",
-    investment: "₹20L – ₹40L",
-    area: "1000 – 1800 sq.ft.",
-    demand: "High",
-  },
-  {
-    city: "Delhi NCR",
-    state: "Delhi",
-    model: "FOFO",
-    investment: "₹15L – ₹30L",
-    area: "800 – 1500 sq.ft.",
-    demand: "High",
-  },
-  {
-    city: "Jaipur",
-    state: "Rajasthan",
-    model: "FOFO",
-    investment: "₹12L – ₹25L",
-    area: "700 – 1300 sq.ft.",
-    demand: "Growing",
-  },
-];
-
-const benefits = [
-  {
-    icon: Store,
-    title: "Physical + Digital",
-    text: "Connect your local store with the D2C Mall online ecosystem.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Growing Categories",
-    text: "Access fashion, beauty, lifestyle, electronics and more.",
-  },
-  {
-    icon: BarChart3,
-    title: "Business Visibility",
-    text: "Track enquiries, sales, inventory and store performance.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Operational Support",
-    text: "Get structured support across supply, technology and operations.",
-  },
-];
-
-const faqs = [
-  {
-    question: "What franchise models are available?",
-    answer:
-      "D2C Mall supports FOFO and FOCO-style opportunities depending on the location and business requirement.",
-  },
-  {
-    question: "Can I apply for a specific city?",
-    answer:
-      "Yes. You can select your preferred city and provide your proposed store location during the application process.",
-  },
-  {
-    question: "What information is required?",
-    answer:
-      "The application captures your contact details, preferred location, investment range, business experience and proposed store information.",
-  },
-  {
-    question: "How is an application reviewed?",
-    answer:
-      "The franchise team reviews the submitted information, location suitability and business requirements before contacting the applicant.",
-  },
-];
-
-export default function FranchisePage({
-  onApply,
-  onViewOpportunity,
-}) {
-  const [openFaq, setOpenFaq] =
-    useState(null);
+function Calculator_({ defaultTier = "standard" }) {
+  const [tierId, setTierId] = useState(defaultTier);
+  const [footfall, setFootfall] = useState(180);
+  const [conversion, setConversion] = useState(18);
+  const [bill, setBill] = useState(1400);
+  const tier = franchiseTiers.find((t) => t.id === tierId);
+  const calc = useMemo(() => {
+    const monthlySales = footfall * 30 * (conversion / 100) * bill;
+    const marginPct = { express: 0.25, standard: 0.27, flagship: 0.29 }[tierId];
+    const gross = monthlySales * marginPct;
+    const opex = { express: 110000, standard: 220000, flagship: 520000 }[tierId];
+    const royalty = monthlySales * (tierId === "flagship" ? 0.035 : 0.04);
+    const net = gross - opex - royalty;
+    const payback = net > 0 ? Math.ceil(tier.investment / net) : null;
+    return { monthlySales, gross, opex, royalty, net, payback, roi: net > 0 ? ((net * 12) / tier.investment) * 100 : 0 };
+  }, [footfall, conversion, bill, tierId, tier]);
 
   return (
-    <main className="franchise-page">
-      <section className="franchise-hero">
-        <div className="franchise-hero-copy">
-          <span className="franchise-eyebrow">
-            BUILD WITH D2C MALL
-          </span>
-
-          <h1>
-            Bring D2C Mall
-            <br />
-            <em>to your city.</em>
-          </h1>
-
-          <p>
-            Build a modern retail business powered by
-            the D2C Mall ecosystem — online discovery,
-            offline experience and operational support
-            in one platform.
-          </p>
-
-          <div className="franchise-hero-actions">
-            <button
-              type="button"
-              onClick={() =>
-                onApply?.()
-              }
-            >
-              Apply for Franchise
-              <ArrowRight size={16} />
+    <div className="calc">
+      <div className="calc-inputs">
+        <div className="seg w-full">
+          {franchiseTiers.map((t) => (
+            <button key={t.id} className={cx("grow", tierId === t.id && "active")} onClick={() => setTierId(t.id)}>
+              {t.investmentLabel}
             </button>
-
-            <button
-              type="button"
-              className="secondary"
-              onClick={() =>
-                document
-                  .getElementById(
-                    "franchise-opportunities"
-                  )
-                  ?.scrollIntoView({
-                    behavior: "smooth",
-                  })
-              }
-            >
-              Explore Opportunities
-            </button>
-          </div>
-
-          <div className="franchise-hero-stats">
-            <div>
-              <strong>4+</strong>
-              <span>
-                Major operating hubs
-              </span>
-            </div>
-
-            <div>
-              <strong>2</strong>
-              <span>
-                Franchise models
-              </span>
-            </div>
-
-            <div>
-              <strong>Pan India</strong>
-              <span>
-                Expansion vision
-              </span>
-            </div>
-          </div>
+          ))}
         </div>
+        {[
+          ["Daily footfall", footfall, setFootfall, 40, 800, 10, (v) => `${v} visitors`],
+          ["Conversion rate", conversion, setConversion, 5, 40, 1, (v) => `${v}%`],
+          ["Average bill value", bill, setBill, 500, 4000, 50, (v) => formatINR(v)],
+        ].map(([label, v, set, min, max, step, fmt]) => (
+          <label key={label} className="calc-slider">
+            <span className="row between small">
+              <b>{label}</b>
+              <span className="text-blue bold">{fmt(v)}</span>
+            </span>
+            <input type="range" min={min} max={max} step={step} value={v} onChange={(e) => set(Number(e.target.value))} />
+          </label>
+        ))}
+        <p className="xs muted">Estimates are indicative and depend on location, season and execution. Final projections are shared after site verification.</p>
+      </div>
+      <div className="calc-out">
+        <span className="xs" style={{ opacity: 0.8 }}>Estimated monthly profit · {tier.name}</span>
+        <b className="calc-big">{formatINR(Math.max(calc.net, 0))}</b>
+        <div className="calc-rows">
+          <div><span>Monthly sales</span><b>{formatINR(calc.monthlySales)}</b></div>
+          <div><span>Gross margin</span><b>{formatINR(calc.gross)}</b></div>
+          <div><span>Operating costs</span><b>−{formatINR(calc.opex)}</b></div>
+          <div><span>Royalty</span><b>−{formatINR(calc.royalty)}</b></div>
+          <div><span>Annual ROI</span><b>{calc.roi.toFixed(0)}%</b></div>
+          <div><span>Payback</span><b>{calc.payback ? `~${calc.payback} months` : "—"}</b></div>
+        </div>
+        <Link to={`/franchise/apply?tier=${tierId}`} className="btn btn-white btn-block mt-16">
+          Apply for {tier.investmentLabel} format <ArrowRight size={16} />
+        </Link>
+      </div>
+    </div>
+  );
+}
 
-        <div className="franchise-hero-visual">
-          <div className="franchise-store-card">
-            <div className="franchise-store-top">
-              <span>D2C MALL</span>
-              <span>STORE</span>
-            </div>
+export default function FranchisePage() {
+  useDocumentTitle("Franchise opportunities");
+  const [faq, setFaq] = useState(0);
+  const [q, setQ] = useState("");
+  const cities = franchiseCities.filter((c) => `${c.city} ${c.state}`.toLowerCase().includes(q.toLowerCase()));
 
-            <div className="franchise-store-main">
-              <Store size={48} />
-              <strong>
-                Your City.
-                <br />
-                Your Store.
-              </strong>
-              <span>
-                Connected to a larger
-                <br />
-                D2C ecosystem.
-              </span>
-            </div>
-
-            <div className="franchise-store-bottom">
-              <span>
-                ONLINE + OFFLINE
-              </span>
-              <ArrowRight size={17} />
+  return (
+    <div className="page franchise">
+      <div className="container">
+        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Franchise" }]} />
+        <div className="fr-hero">
+          <div>
+            <span className="eyebrow light">
+              <Store size={13} /> D2C Mall franchise programme
+            </span>
+            <h1>
+              Bring India's best D2C brands
+              <br />
+              <span>to your city.</span>
+            </h1>
+            <p>Three store formats from ₹11 Lakh. FOFO & FOCO models, tech-powered inventory from our 4-warehouse network, and a brand portfolio customers already love online.</p>
+            <div className="row gap-6 wrap mt-24">
+              <Link to="/franchise/apply" className="btn btn-lg">
+                Apply now <ArrowRight size={18} />
+              </Link>
+              <a href="#calculator" className="btn btn-lg btn-glass">
+                <Calculator size={17} /> Estimate returns
+              </a>
+              <Link to="/franchise/status" className="btn btn-lg btn-glass">
+                <Search size={17} /> Track application
+              </Link>
             </div>
           </div>
-
-          <div className="franchise-floating-card location">
-            <MapPin size={15} />
-            <div>
-              <strong>
-                Local presence
-              </strong>
-              <span>
-                Connected retail
-              </span>
-            </div>
-          </div>
-
-          <div className="franchise-floating-card growth">
-            <TrendingUp size={15} />
-            <div>
-              <strong>
-                Growth focused
-              </strong>
-              <span>
-                Data-led operations
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="franchise-benefits">
-        <div className="franchise-section-heading">
-          <span>WHY D2C MALL</span>
-          <h2>
-            More than a storefront.
-          </h2>
-          <p>
-            A franchise becomes part of the larger
-            customer, commerce and operations network.
-          </p>
-        </div>
-
-        <div className="franchise-benefit-grid">
-          {benefits.map(
-            ({
-              icon: Icon,
-              title,
-              text,
-            }) => (
-              <motion.article
-                key={title}
-                whileHover={{
-                  y: -4,
-                }}
-              >
-                <div>
-                  <Icon size={20} />
-                </div>
-
-                <h3>{title}</h3>
-
-                <p>{text}</p>
-              </motion.article>
-            )
-          )}
-        </div>
-      </section>
-
-      <section
-        id="franchise-opportunities"
-        className="franchise-opportunities"
-      >
-        <div className="franchise-section-heading">
-          <span>AVAILABLE OPPORTUNITIES</span>
-          <h2>
-            Find your market.
-          </h2>
-          <p>
-            Explore example franchise opportunities
-            by city, model and investment range.
-          </p>
-        </div>
-
-        <div className="franchise-opportunity-table">
-          <div className="franchise-table-head">
-            <span>LOCATION</span>
-            <span>MODEL</span>
-            <span>INVESTMENT</span>
-            <span>STORE AREA</span>
-            <span>DEMAND</span>
-            <span />
-          </div>
-
-          {opportunities.map(
-            (item) => (
-              <motion.div
-                className="franchise-table-row"
-                key={`${item.city}-${item.model}`}
-                whileHover={{
-                  x: 3,
-                }}
-              >
-                <div className="franchise-location">
-                  <div>
-                    <MapPin size={14} />
-                  </div>
-
-                  <section>
-                    <strong>
-                      {item.city}
-                    </strong>
-                    <span>
-                      {item.state}
-                    </span>
-                  </section>
-                </div>
-
-                <strong>
-                  {item.model}
-                </strong>
-
-                <span>
-                  {item.investment}
-                </span>
-
-                <span>
-                  {item.area}
-                </span>
-
-                <span
-                  className={`franchise-demand ${item.demand
-                    .toLowerCase()
-                    .replace(" ", "-")}`}
-                >
-                  {item.demand}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    onViewOpportunity?.(
-                      item
-                    )
-                  }
-                >
-                  View
-                  <ChevronRight
-                    size={14}
-                  />
-                </button>
+          <div className="fr-hero-stats">
+            {[
+              ["₹11L – ₹51L", "Investment range"],
+              ["3 formats", "Express · Store · Flagship"],
+              ["18 – 30 mo", "Indicative payback"],
+              ["45 – 75 days", "Approval to launch"],
+            ].map(([v, l], i) => (
+              <motion.div key={l} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 * i }}>
+                <b>{v}</b>
+                <span>{l}</span>
               </motion.div>
-            )
-          )}
-        </div>
-      </section>
-
-      <section className="franchise-models">
-        <div className="franchise-section-heading">
-          <span>CHOOSE YOUR MODEL</span>
-          <h2>
-            Two ways to build.
-          </h2>
+            ))}
+          </div>
         </div>
 
-        <div className="franchise-model-grid">
-          <article>
-            <div className="franchise-model-number">
-              01
+        <section className="section">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow">Store formats</span>
+              <h2 className="section-title">Choose your investment</h2>
+              <p className="section-sub">Every format includes branding, fit-out design, POS & inventory software, stock support and training.</p>
             </div>
-
-            <h3>FOFO</h3>
-
-            <span>
-              Franchise Owned · Franchise
-              Operated
-            </span>
-
-            <p>
-              You own and operate the store while
-              becoming part of the D2C Mall retail
-              ecosystem.
-            </p>
-
-            <ul>
-              <li>
-                <CheckCircle2 size={14} />
-                Store ownership
-              </li>
-              <li>
-                <CheckCircle2 size={14} />
-                Local operations
-              </li>
-              <li>
-                <CheckCircle2 size={14} />
-                D2C Mall ecosystem
-              </li>
-            </ul>
-          </article>
-
-          <article>
-            <div className="franchise-model-number">
-              02
-            </div>
-
-            <h3>FOCO</h3>
-
-            <span>
-              Franchise Owned · Company
-              Operated
-            </span>
-
-            <p>
-              Own the franchise while D2C Mall manages
-              agreed operational responsibilities.
-            </p>
-
-            <ul>
-              <li>
-                <CheckCircle2 size={14} />
-                Franchise ownership
-              </li>
-              <li>
-                <CheckCircle2 size={14} />
-                Operational support
-              </li>
-              <li>
-                <CheckCircle2 size={14} />
-                Centralized systems
-              </li>
-            </ul>
-          </article>
-        </div>
-      </section>
-
-      <section className="franchise-process">
-        <div className="franchise-section-heading">
-          <span>HOW IT WORKS</span>
-          <h2>
-            From application to launch.
-          </h2>
-        </div>
-
-        <div className="franchise-process-grid">
-          {[
-            [
-              "01",
-              "Apply",
-              "Tell us about yourself, your city and your proposed location.",
-            ],
-            [
-              "02",
-              "Review",
-              "Our franchise team evaluates the opportunity and location.",
-            ],
-            [
-              "03",
-              "Plan",
-              "Finalize the model, store plan and operating structure.",
-            ],
-            [
-              "04",
-              "Launch",
-              "Open your store and connect it to the D2C Mall ecosystem.",
-            ],
-          ].map(
-            ([number, title, text]) => (
-              <article key={number}>
-                <strong>{number}</strong>
-                <h3>{title}</h3>
-                <p>{text}</p>
-              </article>
-            )
-          )}
-        </div>
-      </section>
-
-      <section className="franchise-application">
-        <div>
-          <span>
-            READY TO BUILD?
-          </span>
-
-          <h2>
-            Your next store could be
-            <br />
-            <em>the one everyone talks about.</em>
-          </h2>
-
-          <p>
-            Submit your interest and the franchise team
-            can take the conversation forward.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            onApply?.()
-          }
-        >
-          Start Application
-          <ArrowRight size={17} />
-        </button>
-      </section>
-
-      <section className="franchise-faq">
-        <div className="franchise-section-heading">
-          <span>FAQ</span>
-          <h2>
-            Questions, answered.
-          </h2>
-        </div>
-
-        <div className="franchise-faq-list">
-          {faqs.map(
-            (faq, index) => {
-              const isOpen =
-                openFaq === index;
-
-              return (
-                <div
-                  className={`franchise-faq-item ${
-                    isOpen
-                      ? "open"
-                      : ""
-                  }`}
-                  key={faq.question}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setOpenFaq(
-                        isOpen
-                          ? null
-                          : index
-                      )
-                    }
-                  >
-                    <span>
-                      {faq.question}
-                    </span>
-
-                    <ChevronDown
-                      size={16}
-                    />
-                  </button>
-
-                  {isOpen && (
-                    <p>
-                      {faq.answer}
-                    </p>
-                  )}
+          </div>
+          <div className="tiers">
+            {franchiseTiers.map((t, i) => (
+              <motion.div key={t.id} className={cx("tier-card", t.popular && "popular")} style={{ "--tc": t.color }} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}>
+                {t.popular ? <span className="tier-popular">Most popular</span> : null}
+                <span className="tier-name">{t.name}</span>
+                <b className="tier-price">{t.investmentLabel}</b>
+                <p className="small muted">{t.tagline}</p>
+                <div className="row gap-6 mt-8">
+                  {t.model.map((m) => (
+                    <span key={m} className="badge badge-soft-blue">{m}</span>
+                  ))}
                 </div>
-              );
-            }
-          )}
-        </div>
-      </section>
-    </main>
+                <div className="tier-specs">
+                  <div><span>Store size</span><b>{t.areaSqft}</b></div>
+                  <div><span>Assortment</span><b>{t.brands}</b></div>
+                  <div><span>SKUs</span><b>{t.skus}</b></div>
+                  <div><span>Team</span><b>{t.staff}</b></div>
+                  <div><span>Gross margin</span><b>{t.marginPct}</b></div>
+                  <div><span>Payback</span><b>{t.paybackMonths} months</b></div>
+                  <div><span>Royalty</span><b>{t.royaltyPct}</b></div>
+                  <div><span>Franchise fee</span><b>{t.fee}</b></div>
+                </div>
+                <ul className="tier-inc">
+                  {t.includes.map((x) => (
+                    <li key={x}>
+                      <Check size={14} /> {x}
+                    </li>
+                  ))}
+                </ul>
+                <p className="xs muted">Ideal for: {t.ideal}</p>
+                <Link to={`/franchise/apply?tier=${t.id}`} className={cx("btn btn-block mt-12", t.popular ? "" : "btn-outline")}>
+                  Apply for {t.investmentLabel}
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+          <p className="xs muted mt-12">* Store size, margins, payback and royalty are indicative and will be confirmed in your franchise proposal.</p>
+        </section>
+
+        <section className="section">
+          <div className="grid grid-2">
+            {Object.entries(franchiseModels).map(([k, m]) => (
+              <div key={k} className={cx("model-card", k.toLowerCase())}>
+                <span className="model-icon">{k === "FOFO" ? <Store size={22} /> : <Handshake size={22} />}</span>
+                <h3>{m.name}</h3>
+                <ul>
+                  {m.points.map((p) => (
+                    <li key={p}>
+                      <BadgeCheck size={15} /> {p}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="section" id="calculator">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow blue">
+                <TrendingUp size={13} /> Investment calculator
+              </span>
+              <h2 className="section-title">Estimate your returns</h2>
+            </div>
+          </div>
+          <Calculator_ />
+        </section>
+
+        <section className="section">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow">How it works</span>
+              <h2 className="section-title">From application to launch</h2>
+            </div>
+          </div>
+          <div className="process">
+            {[
+              [ClipboardCheck, "Apply online", "5-minute application with your location & investment details"],
+              [PhoneCall, "Discovery call", "Our franchise team calls within 48 hours"],
+              [MapPin, "Site verification", "Location, footfall and property checks by our team"],
+              [FileSignature, "Agreement", "Approval, proposal and franchise agreement"],
+              [Building2, "Fit-out & training", "Store build, stock allocation and staff training"],
+              [Rocket, "Grand launch", "Launch marketing with D2C Street creators"],
+            ].map(([Icon, t, s], i) => (
+              <div key={t} className="process-step">
+                <span className="process-num">{i + 1}</span>
+                <Icon size={22} />
+                <b className="small">{t}</b>
+                <span className="xs muted">{s}</span>
+              </div>
+            ))}
+          </div>
+          <p className="xs muted mt-12">Application stages you'll see in tracking: {APPLICATION_STAGES.map((s) => s.label).join(" → ")}</p>
+        </section>
+
+        <section className="section grid grid-2">
+          <div className="card card-pad">
+            <div className="row between wrap gap-10">
+              <h3 className="section-title" style={{ fontSize: 20 }}>Cities open for franchise</h3>
+              <div className="input-group" style={{ maxWidth: 220 }}>
+                <span className="addon"><Search size={14} /></span>
+                <input className="input" placeholder="Search city" value={q} onChange={(e) => setQ(e.target.value)} />
+              </div>
+            </div>
+            <div className="city-list mt-12">
+              {cities.map((c) => (
+                <div key={c.city} className="city-row">
+                  <MapPin size={15} className="text-orange" />
+                  <b className="small grow">
+                    {c.city} <span className="xs muted">{c.state}</span>
+                  </b>
+                  <span className={cx("badge", c.status === "Open" ? "badge-soft-green" : "badge-soft-amber")}>{c.status}</span>
+                  <span className="xs muted">Demand: {c.demand}</span>
+                </div>
+              ))}
+            </div>
+            <p className="xs muted mt-12">Don't see your city? Apply anyway — we evaluate every location.</p>
+          </div>
+          <div className="card card-pad">
+            <h3 className="section-title" style={{ fontSize: 20 }}>Backed by our supply chain</h3>
+            <p className="small muted mt-4">Stores are replenished from the nearest hub with auto-replenishment based on live sales.</p>
+            <div className="col gap-10 mt-16">
+              {warehouses.map((w) => (
+                <div key={w.id} className="city-row">
+                  <Warehouse size={15} style={{ color: w.color }} />
+                  <b className="small grow">{w.name}</b>
+                  <span className="xs muted">{w.capacity.toLocaleString("en-IN")} sq ft</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="section">
+          <h2 className="section-title">Frequently asked questions</h2>
+          <div className="card mt-16">
+            {franchiseFaq.map(([q2, a], i) => (
+              <div key={q2} className="fr-faq">
+                <button onClick={() => setFaq(faq === i ? -1 : i)}>
+                  {q2} <ChevronDown size={17} style={{ transform: faq === i ? "rotate(180deg)" : "none" }} />
+                </button>
+                {faq === i ? <p>{a}</p> : null}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="section fr-cta">
+          <div>
+            <h2>Ready to open your D2C Mall?</h2>
+            <p>Applications are reviewed within 48 hours. No fee to apply.</p>
+          </div>
+          <Link to="/franchise/apply" className="btn btn-lg btn-white">
+            Start application <ArrowRight size={18} />
+          </Link>
+        </section>
+      </div>
+    </div>
   );
 }
