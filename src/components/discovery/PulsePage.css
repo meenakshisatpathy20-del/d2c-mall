@@ -251,3 +251,17 @@
     min-width: 64px;
   }
 }
+
+.pulse-grid > *,
+.pulse-hero > * {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .pulse-kpis {
+    gap: 18px;
+  }
+  .pulse-kpis b {
+    font-size: 20px;
+  }
+}
