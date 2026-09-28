@@ -164,3 +164,16 @@
     display: none;
   }
 }
+
+.auth-card .row {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .auth-card {
+    padding: 22px 18px;
+  }
+  .auth-panel {
+    padding: 24px 12px;
+  }
+}
