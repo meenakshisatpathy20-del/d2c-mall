@@ -1,301 +1,123 @@
-import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  Check,
-  Heart,
-  ShoppingBag,
-} from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Bell, Heart, Share2, ShoppingBag, Trash2, TrendingDown } from "lucide-react";
 import { useShop } from "../../context/ShopContext";
+import { stockOf } from "../../lib/services/inventory";
+import { cx, formatINR } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { getTrendingProducts } from "../../data/catalog";
+import ProductCard from "../common/ProductCard";
+import { Breadcrumbs, Empty, Img, Price, Rail, SectionHead, useDocumentTitle } from "../common/ui";
 import "./WishlistPage.css";
 
-export default function WishlistPage({
-  onProductClick,
-  onContinueShopping,
-}) {
-  const {
-    wishlist,
-    wishlistCount,
-    toggleWishlist,
-    moveWishlistToCart,
-    addToCart,
-  } = useShop();
+export default function WishlistPage() {
+  useDocumentTitle("Wishlist");
+  const { wishlist, removeFromWishlist, moveWishlistToCart, inventory } = useShop();
+  const [sizes, setSizes] = useState({});
+  const [sort, setSort] = useState("recent");
 
-  const handleMoveAllToCart = () => {
-    wishlist.forEach((product) => {
-      const stock =
-        product.stock ??
-        product.availableStock ??
-        0;
+  const list = [...wishlist].sort((a, b) => (sort === "price" ? a.price - b.price : sort === "discount" ? b.discount - a.discount : 0));
+  const totalSaving = wishlist.reduce((t, p) => t + (p.mrp - p.price), 0);
 
-      if (stock > 0) {
-        addToCart(product, 1);
+  const share = async () => {
+    const text = `My D2C Mall wishlist:\n${wishlist.map((p) => `• ${p.brand} ${p.name} — ${formatINR(p.price)}`).join("\n")}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "My wishlist", text });
+      else {
+        await navigator.clipboard.writeText(text);
+        toast("Wishlist copied — share it with friends");
       }
-    });
+    } catch {
+      /* cancelled */
+    }
   };
 
-  if (wishlist.length === 0) {
-    return (
-      <main className="wishlist-page">
-        <div className="wishlist-page-empty">
-          <div className="wishlist-page-heart">
-            <Heart size={32} />
-          </div>
-
-          <span>YOUR SAVED COLLECTION</span>
-
-          <h1>Your wishlist is empty</h1>
-
-          <p>
-            Save products you love and build your own
-            collection. We'll keep them here until
-            you're ready to shop.
-          </p>
-
-          <button
-            type="button"
-            onClick={onContinueShopping}
-          >
-            Discover products
-            <ArrowRight size={16} />
-          </button>
-        </div>
-      </main>
-    );
-  }
-
   return (
-    <main className="wishlist-page">
-      <section className="wishlist-page-heading">
-        <div>
-          <div className="wishlist-page-breadcrumb">
-            Home <span>/</span> Wishlist
+    <div className="page">
+      <div className="container">
+        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Wishlist" }]} />
+        <div className="wl-head">
+          <div>
+            <h1 className="row gap-6">
+              <Heart size={24} className="text-red" fill="currentColor" /> My wishlist
+            </h1>
+            <p className="small muted">
+              {wishlist.length} item{wishlist.length === 1 ? "" : "s"}
+              {totalSaving ? ` · you'd save ${formatINR(totalSaving)} buying today` : ""}
+            </p>
           </div>
-
-          <p>YOUR COLLECTION</p>
-
-          <h1>
-            Wishlist{" "}
-            <small>
-              {wishlistCount}{" "}
-              {wishlistCount === 1
-                ? "item"
-                : "items"}
-            </small>
-          </h1>
-
-          <span>
-            Products you've saved for later.
-          </span>
-        </div>
-
-        <button
-          type="button"
-          className="wishlist-move-all"
-          onClick={handleMoveAllToCart}
-        >
-          <ShoppingBag size={15} />
-          Move available to cart
-        </button>
-      </section>
-
-      <section className="wishlist-page-tools">
-        <div>
-          <strong>{wishlistCount}</strong>
-          <span>saved products</span>
-        </div>
-
-        <div>
-          <Check size={14} />
-          <span>
-            We'll keep your saved products here
-          </span>
-        </div>
-      </section>
-
-      <section className="wishlist-page-grid">
-        {wishlist.map((product, index) => {
-          const stock =
-            product.stock ??
-            product.availableStock ??
-            0;
-
-          const outOfStock = stock <= 0;
-
-          const discount =
-            product.discount ??
-            (product.mrp > product.price
-              ? Math.round(
-                  ((product.mrp - product.price) /
-                    product.mrp) *
-                    100
-                )
-              : 0);
-
-          const image =
-            product.images?.[0] ||
-            product.image ||
-            "";
-
-          const reviewCount =
-            product.reviewCount ??
-            product.reviews ??
-            0;
-
-          return (
-            <motion.article
-              key={product.id}
-              className="wishlist-page-card"
-              initial={{
-                opacity: 0,
-                y: 12,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              transition={{
-                duration: 0.25,
-                delay: Math.min(
-                  index * 0.04,
-                  0.25
-                ),
-              }}
-            >
-              <button
-                type="button"
-                className="wishlist-page-image"
-                onClick={() =>
-                  onProductClick?.(product)
-                }
-              >
-                <img
-                  src={image}
-                  alt={product.name}
-                />
-
-                {discount > 0 && (
-                  <span>
-                    {discount}% OFF
-                  </span>
-                )}
-
-                {outOfStock && (
-                  <div className="wishlist-sold-overlay">
-                    Currently unavailable
-                  </div>
-                )}
+          {wishlist.length ? (
+            <div className="row gap-6">
+              <select className="select" style={{ width: "auto" }} value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="recent">Recently added</option>
+                <option value="price">Price: low to high</option>
+                <option value="discount">Biggest discount</option>
+              </select>
+              <button className="btn btn-outline btn-sm" onClick={share}>
+                <Share2 size={15} /> Share
               </button>
-
-              <div className="wishlist-page-card-info">
-                <div className="wishlist-page-card-top">
-                  <div>
-                    <span>{product.brand}</span>
-
-                    <h2>{product.name}</h2>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      toggleWishlist(product)
-                    }
-                    aria-label="Remove from wishlist"
-                  >
-                    <Heart
-                      size={17}
-                      fill="currentColor"
-                    />
-                  </button>
-                </div>
-
-                {product.rating != null && (
-                  <div className="wishlist-page-rating">
-                    <span>
-                      ★ {product.rating}
-                    </span>
-
-                    <small>
-                      {Number(
-                        reviewCount
-                      ).toLocaleString("en-IN")}{" "}
-                      ratings
-                    </small>
-                  </div>
-                )}
-
-                <div className="wishlist-page-price">
-                  <strong>
-                    ₹
-                    {Number(
-                      product.price || 0
-                    ).toLocaleString("en-IN")}
-                  </strong>
-
-                  {product.mrp >
-                    product.price && (
-                    <del>
-                      ₹
-                      {Number(
-                        product.mrp
-                      ).toLocaleString("en-IN")}
-                    </del>
-                  )}
-
-                  {discount > 0 && (
-                    <span>
-                      {discount}% off
-                    </span>
-                  )}
-                </div>
-
-                {outOfStock ? (
-                  <button
-                    type="button"
-                    className="wishlist-notify"
-                  >
-                    Notify when available
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="wishlist-move"
-                    onClick={() =>
-                      moveWishlistToCart(product)
-                    }
-                  >
-                    <ShoppingBag size={14} />
-                    Move to Cart
-                  </button>
-                )}
-              </div>
-            </motion.article>
-          );
-        })}
-      </section>
-
-      <section className="wishlist-discovery">
-        <div>
-          <span>D2C DISCOVERY</span>
-
-          <h2>
-            Your next favourite could be
-            waiting.
-          </h2>
-
-          <p>
-            Explore new drops, trending products and
-            community picks across D2C Mall.
-          </p>
+            </div>
+          ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={onContinueShopping}
-        >
-          Continue shopping
-          <ArrowRight size={15} />
-        </button>
-      </section>
-    </main>
+        {wishlist.length ? (
+          <div className="wl-grid">
+            {list.map((p) => {
+              const stock = stockOf(p.id, inventory).sellable;
+              return (
+                <div key={p.id} className="wl-card">
+                  <Link to={`/product/${p.id}`} className="wl-media">
+                    <Img src={p.images[0]} alt={p.name} label={p.brand} />
+                    {p.discount >= 40 ? (
+                      <span className="badge badge-green wl-drop">
+                        <TrendingDown size={11} /> Price drop
+                      </span>
+                    ) : null}
+                  </Link>
+                  <button className="wl-remove" onClick={() => removeFromWishlist(p.id)} aria-label="Remove">
+                    <Trash2 size={15} />
+                  </button>
+                  <div className="wl-body">
+                    <b className="small">{p.brand}</b>
+                    <span className="xs muted ellipsis">{p.name}</span>
+                    <Price price={p.price} mrp={p.mrp} />
+                    {stock <= 0 ? (
+                      <span className="xs text-red bold row gap-4">
+                        <Bell size={12} /> Out of stock — we'll notify you
+                      </span>
+                    ) : stock <= 5 ? (
+                      <span className="xs text-orange bold">Only {stock} left!</span>
+                    ) : null}
+                    {p.sizes.length && stock > 0 ? (
+                      <div className="wl-sizes">
+                        {p.sizes.map((s) => (
+                          <button key={s} className={cx(sizes[p.id] === s && "active")} disabled={p.soldOutSizes?.includes(s)} onClick={() => setSizes({ ...sizes, [p.id]: s })}>
+                            {s.replace("UK ", "")}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <button className="wl-move" disabled={stock <= 0} onClick={() => moveWishlistToCart(p, { size: sizes[p.id] || null })}>
+                    <ShoppingBag size={15} /> Move to bag
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <Empty icon={<Heart size={34} />} title="Your wishlist is empty" text="Tap the ♥ on any product to save it here. We'll let you know when prices drop." action={<Link to="/trending" className="btn">Explore trending</Link>} />
+        )}
+
+        <section className="section">
+          <SectionHead title="You may also like" eyebrow="Inspired by your wishlist" />
+          <Rail>
+            {getTrendingProducts().map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </Rail>
+        </section>
+      </div>
+    </div>
   );
 }
