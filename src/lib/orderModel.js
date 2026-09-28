@@ -155,6 +155,17 @@ export function deriveOrderStatus(order, now = Date.now()) {
   return "confirmed";
 }
 
+/** Current ETA: the later of the promised date and the planned delivery event (after re-attempts). */
+export function shipmentEta(shipment) {
+  const planned = shipment?.plan?.filter((e) => e.status === "delivered").slice(-1)[0]?.at || 0;
+  return Math.max(shipment?.etaAt || 0, planned);
+}
+
+export function orderEta(order) {
+  const etas = (order.shipments || []).filter((s) => !s.cancelled).map(shipmentEta);
+  return etas.length ? Math.max(...etas) : order.etaAt;
+}
+
 export function deliveredAt(order, now = Date.now()) {
   const times = (order.shipments || []).map((s) => shipmentEvents(s, now).find((e) => e.status === "delivered")?.at).filter(Boolean);
   return times.length === order.shipments?.length ? Math.max(...times) : null;

@@ -130,7 +130,7 @@ function makeOrder({ id, userId, customer, addr, lines, createdAt, method = "upi
       razorpayOrderId: paid ? `order_${id.slice(-8)}Rz` : null,
       razorpayPaymentId: paid ? `pay_${id.slice(-8)}Pk` : null,
       signatureVerified: paid,
-      instrument: { upi: "UPI · aditi@okhdfcbank", card: "Visa •••• 4242", netbanking: "HDFC NetBanking", cod: "Cash on Delivery" }[method],
+      instrument: { upi: `UPI · ${customer.split(" ")[0].toLowerCase()}@okhdfcbank`, card: "Visa •••• 4242", netbanking: "HDFC NetBanking", cod: "Cash on Delivery" }[method],
       paidAt: paid ? createdAt + 60000 : null,
       attempts: [{ at: createdAt, status: paid ? "success" : "cod" }],
     },

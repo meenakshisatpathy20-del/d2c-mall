@@ -1,877 +1,308 @@
 import { useMemo, useState } from "react";
-import {
-  Search,
-  Package,
-  Truck,
-  CheckCircle2,
-  Clock3,
-  XCircle,
-  RotateCcw,
-  MapPin,
-  ChevronRight,
-  ShoppingBag,
-  Download,
-  RefreshCw,
-  Star,
-  CalendarDays,
-  CreditCard,
-  CircleHelp,
-} from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ChevronRight, CreditCard, FileText, HelpCircle, Package, RefreshCcw, RotateCcw, Search, ShoppingBag, Star, Truck, XCircle } from "lucide-react";
+import { useStore } from "../../lib/store";
+import { useCurrentUser } from "../../lib/services/account";
+import { useShop } from "../../context/ShopContext";
+import { productMap } from "../../data/catalog";
+import { ORDER_STATUS, deliveredAt, deriveOrderStatus, orderEta, orderTab } from "../../lib/orderModel";
+import { canCancel } from "../../lib/services/orders";
+import { useNow } from "../../lib/services/liveSync";
+import { cx, dayLabel, formatDate, formatINR } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { Breadcrumbs, Empty, Img, StatusPill, useDocumentTitle } from "../common/ui";
+import { CancelModal, InvoiceModal, ShipmentProgress, SupportModal } from "./OrderBits";
 import "./OrdersPage.css";
 
-const defaultOrders = [
-  {
-    id: "D2C-ORD-10482",
-    date: "23 Sep 2026",
-    status: "Delivered",
-    paymentStatus: "Paid",
-    paymentMethod: "UPI",
-    total: 1898,
-    itemCount: 2,
-    deliveryDate: "26 Sep 2026",
-    address: {
-      name: "Priyank Raj",
-      line: "Bhubaneswar Road",
-      city: "Ranchi",
-      state: "Jharkhand",
-      pincode: "834001",
-    },
-    shipment: {
-      awb: "D2CAWB839201",
-      carrier: "Shiprocket",
-      warehouse: "Bengaluru",
-      status: "Delivered",
-    },
-    items: [
-      {
-        id: "d2c-women-001",
-        name: "Relaxed Fit Cotton Shirt",
-        brand: "D2C Studio",
-        image: "",
-        price: 899,
-        quantity: 1,
-        size: "M",
-        color: "White",
-      },
-      {
-        id: "d2c-beauty-001",
-        name: "Hydrating Glow Face Serum",
-        brand: "GlowLab",
-        image: "",
-        price: 999,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "D2C-ORD-10451",
-    date: "21 Sep 2026",
-    status: "Out for Delivery",
-    paymentStatus: "Paid",
-    paymentMethod: "Card",
-    total: 2499,
-    itemCount: 1,
-    deliveryDate: "24 Sep 2026",
-    address: {
-      name: "Priyank Raj",
-      line: "Main Road",
-      city: "Ranchi",
-      state: "Jharkhand",
-      pincode: "834001",
-    },
-    shipment: {
-      awb: "D2CAWB839144",
-      carrier: "Delhivery",
-      warehouse: "Delhi NCR",
-      status: "Out for Delivery",
-    },
-    items: [
-      {
-        id: "d2c-electronics-001",
-        name: "Wireless Noise-Cancelling Headphones",
-        brand: "SoundCore D2C",
-        image: "",
-        price: 2499,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "D2C-ORD-10397",
-    date: "18 Sep 2026",
-    status: "Shipped",
-    paymentStatus: "Paid",
-    paymentMethod: "UPI",
-    total: 1499,
-    itemCount: 1,
-    deliveryDate: "25 Sep 2026",
-    address: {
-      name: "Priyank Raj",
-      line: "Lalpur",
-      city: "Ranchi",
-      state: "Jharkhand",
-      pincode: "834001",
-    },
-    shipment: {
-      awb: "D2CAWB838912",
-      carrier: "Blue Dart",
-      warehouse: "Mumbai Bhiwandi",
-      status: "Shipped",
-    },
-    items: [
-      {
-        id: "d2c-footwear-001",
-        name: "Everyday Street Sneakers",
-        brand: "StreetForm",
-        image: "",
-        price: 1499,
-        quantity: 1,
-        size: "8",
-        color: "White",
-      },
-    ],
-  },
-  {
-    id: "D2C-ORD-10341",
-    date: "15 Sep 2026",
-    status: "Processing",
-    paymentStatus: "Paid",
-    paymentMethod: "Net Banking",
-    total: 2398,
-    itemCount: 2,
-    deliveryDate: "27 Sep 2026",
-    address: {
-      name: "Priyank Raj",
-      line: "Harmu Road",
-      city: "Ranchi",
-      state: "Jharkhand",
-      pincode: "834001",
-    },
-    shipment: {
-      awb: "",
-      carrier: "Shiprocket",
-      warehouse: "Jaipur",
-      status: "Processing",
-    },
-    items: [
-      {
-        id: "d2c-jewellery-001",
-        name: "Minimal Gold-Tone Necklace",
-        brand: "Lustre",
-        image: "",
-        price: 799,
-        quantity: 1,
-      },
-      {
-        id: "d2c-home-001",
-        name: "Modern Accent Table Lamp",
-        brand: "CasaForm",
-        image: "",
-        price: 1599,
-        quantity: 1,
-      },
-    ],
-  },
-  {
-    id: "D2C-ORD-10284",
-    date: "10 Sep 2026",
-    status: "Returned",
-    paymentStatus: "Refunded",
-    paymentMethod: "UPI",
-    total: 1299,
-    itemCount: 1,
-    deliveryDate: "13 Sep 2026",
-    address: {
-      name: "Priyank Raj",
-      line: "Morabadi",
-      city: "Ranchi",
-      state: "Jharkhand",
-      pincode: "834008",
-    },
-    shipment: {
-      awb: "D2CAWB837611",
-      carrier: "Delhivery",
-      warehouse: "Delhi NCR",
-      status: "Returned",
-    },
-    items: [
-      {
-        id: "d2c-women-002",
-        name: "Flowy Printed Midi Dress",
-        brand: "D2C Edit",
-        image: "",
-        price: 1299,
-        quantity: 1,
-        size: "M",
-        color: "Blue",
-      },
-    ],
-  },
-  {
-    id: "D2C-ORD-10211",
-    date: "05 Sep 2026",
-    status: "Cancelled",
-    paymentStatus: "Refunded",
-    paymentMethod: "COD",
-    total: 799,
-    itemCount: 1,
-    deliveryDate: "",
-    address: {
-      name: "Priyank Raj",
-      line: "Kanke Road",
-      city: "Ranchi",
-      state: "Jharkhand",
-      pincode: "834008",
-    },
-    shipment: {
-      awb: "",
-      carrier: "",
-      warehouse: "Bengaluru",
-      status: "Cancelled",
-    },
-    items: [
-      {
-        id: "d2c-jewellery-001",
-        name: "Minimal Gold-Tone Necklace",
-        brand: "Lustre",
-        image: "",
-        price: 799,
-        quantity: 1,
-      },
-    ],
-  },
+const TABS = [
+  { id: "all", label: "All" },
+  { id: "processing", label: "Processing" },
+  { id: "shipped", label: "Shipped" },
+  { id: "out_for_delivery", label: "Out for delivery" },
+  { id: "delivered", label: "Delivered" },
+  { id: "cancelled", label: "Cancelled" },
+  { id: "returned", label: "Returned" },
 ];
 
-const tabs = [
-  { key: "All", label: "All Orders" },
-  { key: "Processing", label: "Processing" },
-  { key: "Shipped", label: "Shipped" },
-  { key: "Out for Delivery", label: "Out for Delivery" },
-  { key: "Delivered", label: "Delivered" },
-  { key: "Cancelled", label: "Cancelled" },
-  { key: "Returned", label: "Returned" },
+const RANGES = [
+  { id: "all", label: "All time", ms: Infinity },
+  { id: "30", label: "Last 30 days", ms: 30 * 86400000 },
+  { id: "180", label: "Last 6 months", ms: 180 * 86400000 },
 ];
 
-const statusConfig = {
-  Processing: {
-    icon: Clock3,
-    className: "order-status-processing",
-  },
-  Shipped: {
-    icon: Truck,
-    className: "order-status-shipped",
-  },
-  "Out for Delivery": {
-    icon: Truck,
-    className: "order-status-out",
-  },
-  Delivered: {
-    icon: CheckCircle2,
-    className: "order-status-delivered",
-  },
-  Cancelled: {
-    icon: XCircle,
-    className: "order-status-cancelled",
-  },
-  Returned: {
-    icon: RotateCcw,
-    className: "order-status-returned",
-  },
-};
+export default function OrdersPage() {
+  useDocumentTitle("My orders");
+  const user = useCurrentUser();
+  const all = useStore((s) => s.orders);
+  const now = useNow(5000);
+  const navigate = useNavigate();
+  const { addToCart } = useShop();
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") || "all";
+  const [q, setQ] = useState("");
+  const [range, setRange] = useState("all");
+  const [pay, setPay] = useState("all");
+  const [invoice, setInvoice] = useState(null);
+  const [cancel, setCancel] = useState(null);
+  const [support, setSupport] = useState(null);
 
-const formatPrice = (value) =>
-  `₹${Number(value || 0).toLocaleString("en-IN")}`;
-
-const resolveImage = (item) =>
-  item?.image ||
-  item?.images?.[0] ||
-  item?.thumbnail ||
-  "";
-
-const getInitials = (name = "") =>
-  name
-    .split(" ")
-    .map((word) => word[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-function StatusBadge({ status }) {
-  const config = statusConfig[status] || statusConfig.Processing;
-  const Icon = config.icon;
-
-  return (
-    <span className={`order-status-badge ${config.className}`}>
-      <Icon size={14} />
-      {status}
-    </span>
+  const mine = useMemo(
+    () => all.filter((o) => o.userId === user.id).map((o) => ({ ...o, live: deriveOrderStatus(o, now) })),
+    [all, user.id, now]
   );
-}
-
-function ProductImage({ item }) {
-  const image = resolveImage(item);
-
-  if (image) {
-    return (
-      <img
-        src={image}
-        alt={item.name}
-        className="order-product-image"
-      />
-    );
-  }
-
-  return (
-    <div className="order-product-placeholder">
-      <ShoppingBag size={24} />
-    </div>
-  );
-}
-
-function OrderCard({
-  order,
-  onViewDetails,
-  onTrackOrder,
-  onBuyAgain,
-  onReturn,
-  onReview,
-}) {
-  const canReview = order.status === "Delivered";
-  const canReturn =
-    order.status === "Delivered" &&
-    order.date !== "05 Sep 2026";
-
-  return (
-    <article className="order-card">
-      <div className="order-card-top">
-        <div>
-          <div className="order-card-label">Order ID</div>
-          <div className="order-id">{order.id}</div>
-        </div>
-
-        <div className="order-card-date">
-          <CalendarDays size={15} />
-          <span>{order.date}</span>
-        </div>
-      </div>
-
-      <div className="order-card-meta">
-        <StatusBadge status={order.status} />
-
-        <span className="order-payment-status">
-          <CreditCard size={13} />
-          {order.paymentStatus}
-        </span>
-
-        <span className="order-item-count">
-          {order.itemCount} {order.itemCount === 1 ? "item" : "items"}
-        </span>
-      </div>
-
-      <div className="order-items">
-        {order.items.slice(0, 3).map((item) => (
-          <div className="order-item" key={`${order.id}-${item.id}`}>
-            <ProductImage item={item} />
-
-            <div className="order-item-info">
-              <div className="order-item-brand">{item.brand}</div>
-              <div className="order-item-name">{item.name}</div>
-
-              <div className="order-item-variants">
-                {item.size && <span>Size: {item.size}</span>}
-                {item.color && <span>Color: {item.color}</span>}
-                <span>Qty: {item.quantity}</span>
-              </div>
-            </div>
-
-            <div className="order-item-price">
-              {formatPrice(item.price * item.quantity)}
-            </div>
-          </div>
-        ))}
-
-        {order.items.length > 3 && (
-          <div className="order-more-items">
-            +{order.items.length - 3} more items
-          </div>
-        )}
-      </div>
-
-      <div className="order-delivery-strip">
-        <div className="order-delivery-icon">
-          {order.status === "Delivered" ? (
-            <CheckCircle2 size={17} />
-          ) : order.status === "Cancelled" ? (
-            <XCircle size={17} />
-          ) : (
-            <Truck size={17} />
-          )}
-        </div>
-
-        <div>
-          <div className="order-delivery-title">
-            {order.status === "Delivered"
-              ? `Delivered on ${order.deliveryDate}`
-              : order.status === "Cancelled"
-                ? "This order was cancelled"
-                : order.deliveryDate
-                  ? `Expected delivery by ${order.deliveryDate}`
-                  : "Delivery information unavailable"}
-          </div>
-
-          {order.shipment.awb && (
-            <div className="order-delivery-subtitle">
-              AWB {order.shipment.awb} · {order.shipment.carrier}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="order-card-bottom">
-        <div>
-          <span className="order-total-label">Order total</span>
-          <strong>{formatPrice(order.total)}</strong>
-        </div>
-
-        <div className="order-actions">
-          <button
-            type="button"
-            className="order-secondary-btn"
-            onClick={() => onViewDetails?.(order)}
-          >
-            View Details
-            <ChevronRight size={15} />
-          </button>
-
-          {(order.status === "Processing" ||
-            order.status === "Shipped" ||
-            order.status === "Out for Delivery") && (
-            <button
-              type="button"
-              className="order-primary-btn"
-              onClick={() => onTrackOrder?.(order)}
-            >
-              Track Order
-              <Truck size={15} />
-            </button>
-          )}
-
-          {canReview && (
-            <button
-              type="button"
-              className="order-outline-btn"
-              onClick={() => onReview?.(order)}
-            >
-              <Star size={15} />
-              Review
-            </button>
-          )}
-
-          {canReturn && (
-            <button
-              type="button"
-              className="order-outline-btn order-return-btn"
-              onClick={() => onReturn?.(order)}
-            >
-              <RotateCcw size={15} />
-              Return
-            </button>
-          )}
-
-          {(order.status === "Delivered" ||
-            order.status === "Returned" ||
-            order.status === "Cancelled") && (
-            <button
-              type="button"
-              className="order-secondary-btn"
-              onClick={() => onBuyAgain?.(order)}
-            >
-              <RefreshCw size={15} />
-              Buy Again
-            </button>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function EmptyOrders({ activeTab, onShop }) {
-  return (
-    <div className="orders-empty">
-      <div className="orders-empty-icon">
-        <Package size={34} />
-      </div>
-
-      <h3>
-        {activeTab === "All"
-          ? "You haven't placed any orders yet"
-          : `No ${activeTab.toLowerCase()} orders`}
-      </h3>
-
-      <p>
-        {activeTab === "All"
-          ? "Your orders will appear here once you shop something from D2C Mall."
-          : "Try another order filter to see your purchases."}
-      </p>
-
-      {activeTab === "All" && (
-        <button type="button" onClick={onShop}>
-          Start Shopping
-        </button>
-      )}
-    </div>
-  );
-}
-
-export default function OrdersPage({
-  orders: ordersProp,
-  loading = false,
-  onViewDetails,
-  onTrackOrder,
-  onBuyAgain,
-  onReturn,
-  onReview,
-  onShop,
-  onDownloadInvoice,
-}) {
-  const orders = Array.isArray(ordersProp)
-    ? ordersProp
-    : defaultOrders;
-
-  const [activeTab, setActiveTab] = useState("All");
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("newest");
 
   const counts = useMemo(() => {
-    return tabs.reduce(
-      (result, tab) => {
-        result[tab.key] =
-          tab.key === "All"
-            ? orders.length
-            : orders.filter(
-                (order) => order.status === tab.key
-              ).length;
-
-        return result;
-      },
-      {}
-    );
-  }, [orders]);
-
-  const filteredOrders = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    const filtered = orders.filter((order) => {
-      const matchesTab =
-        activeTab === "All" ||
-        order.status === activeTab;
-
-      if (!matchesTab) return false;
-
-      if (!normalizedSearch) return true;
-
-      return [
-        order.id,
-        order.status,
-        order.paymentStatus,
-        order.paymentMethod,
-        order.shipment?.awb,
-        order.shipment?.carrier,
-        ...order.items.map((item) => item.name),
-        ...order.items.map((item) => item.brand),
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value)
-            .toLowerCase()
-            .includes(normalizedSearch)
-        );
+    const c = { all: mine.length };
+    mine.forEach((o) => {
+      const t = orderTab(o.live);
+      c[t] = (c[t] || 0) + 1;
     });
+    return c;
+  }, [mine]);
 
-    return [...filtered].sort((a, b) => {
-      if (sort === "price-high") {
-        return Number(b.total) - Number(a.total);
-      }
-
-      if (sort === "price-low") {
-        return Number(a.total) - Number(b.total);
-      }
-
-      return 0;
+  const list = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const r = RANGES.find((x) => x.id === range);
+    return mine.filter((o) => {
+      if (tab !== "all" && orderTab(o.live) !== tab) return false;
+      if (Date.now() - o.createdAt > r.ms) return false;
+      if (pay !== "all" && (pay === "cod" ? o.payment.method !== "cod" : o.payment.method === "cod")) return false;
+      if (!term) return true;
+      return o.id.toLowerCase().includes(term) || o.items.some((i) => `${i.name} ${i.brand} ${i.sku}`.toLowerCase().includes(term));
     });
-  }, [orders, activeTab, search, sort]);
+  }, [mine, tab, q, range, pay]);
 
-  const totalSpent = useMemo(
-    () =>
-      orders
-        .filter((order) => order.status !== "Cancelled")
-        .reduce(
-          (sum, order) => sum + Number(order.total || 0),
-          0
-        ),
-    [orders]
-  );
+  const stats = useMemo(() => {
+    const valid = mine.filter((o) => !["cancelled", "payment_failed", "pending_payment"].includes(o.live));
+    return {
+      spent: valid.reduce((t, o) => t + o.pricing.total, 0),
+      saved: valid.reduce((t, o) => t + o.pricing.savings, 0),
+      active: mine.filter((o) => ["confirmed", "processing", "shipped", "out_for_delivery"].includes(o.live)).length,
+    };
+  }, [mine]);
 
-  const handleDownloadAll = () => {
-    if (onDownloadInvoice) {
-      onDownloadInvoice(filteredOrders);
-      return;
+  const buyAgain = (o) => {
+    let n = 0;
+    o.items.forEach((i) => {
+      const p = productMap[i.productId];
+      if (p && addToCart(p, { size: i.size, color: i.color, silent: true })) n += 1;
+    });
+    if (n) {
+      toast(`${n} item${n > 1 ? "s" : ""} added to bag`);
+      navigate("/cart");
     }
+  };
 
-    const content = filteredOrders
-      .map(
-        (order) =>
-          `${order.id},${order.date},${order.status},${order.total}`
-      )
-      .join("\n");
-
-    const blob = new Blob(
-      [`Order ID,Date,Status,Total\n${content}`],
-      { type: "text/csv;charset=utf-8;" }
-    );
-
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-
-    anchor.href = url;
-    anchor.download = "d2c-orders.csv";
-    anchor.click();
-
-    URL.revokeObjectURL(url);
+  const setTab = (id) => {
+    const next = new URLSearchParams(params);
+    if (id === "all") next.delete("tab");
+    else next.set("tab", id);
+    setParams(next, { replace: true });
   };
 
   return (
-    <main className="orders-page">
-      <section className="orders-header">
-        <div className="orders-heading">
-          <div className="orders-heading-icon">
-            <ShoppingBag size={23} />
-          </div>
-
+    <div className="page">
+      <div className="container">
+        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Account", to: "/account" }, { label: "Orders" }]} />
+        <div className="orders-hero">
           <div>
-            <p className="orders-eyebrow">D2C MALL</p>
-            <h1>My Orders</h1>
-            <p>
-              Track your purchases, deliveries and returns
-              from one place.
-            </p>
+            <span className="eyebrow light">
+              <Package size={13} /> Orders dashboard
+            </span>
+            <h1>My orders</h1>
+            <p>Track, return or buy things again. Live updates from Shiprocket every few seconds.</p>
+          </div>
+          <div className="orders-stats">
+            <div>
+              <b>{mine.length}</b>
+              <span>orders</span>
+            </div>
+            <div>
+              <b>{stats.active}</b>
+              <span>in progress</span>
+            </div>
+            <div>
+              <b>{formatINR(stats.spent)}</b>
+              <span>total spent</span>
+            </div>
+            <div>
+              <b className="text-green">{formatINR(stats.saved)}</b>
+              <span>total saved</span>
+            </div>
           </div>
         </div>
 
-        <div className="orders-header-actions">
-          <button
-            type="button"
-            className="orders-help-btn"
-            onClick={() =>
-              window.location.href = "/help"
-            }
-          >
-            <CircleHelp size={17} />
-            Help Center
-          </button>
-
-          <button
-            type="button"
-            className="orders-download-btn"
-            onClick={handleDownloadAll}
-          >
-            <Download size={16} />
-            Export Orders
-          </button>
-        </div>
-      </section>
-
-      <section className="orders-summary">
-        <div className="orders-summary-card">
-          <span>Total Orders</span>
-          <strong>{orders.length}</strong>
-          <small>All purchases</small>
-        </div>
-
-        <div className="orders-summary-card">
-          <span>In Progress</span>
-          <strong>
-            {counts.Processing +
-              counts.Shipped +
-              counts["Out for Delivery"]}
-          </strong>
-          <small>Currently moving</small>
-        </div>
-
-        <div className="orders-summary-card">
-          <span>Delivered</span>
-          <strong>{counts.Delivered}</strong>
-          <small>Successfully delivered</small>
-        </div>
-
-        <div className="orders-summary-card orders-summary-spend">
-          <span>Total Spent</span>
-          <strong>{formatPrice(totalSpent)}</strong>
-          <small>Across your orders</small>
-        </div>
-      </section>
-
-      <section className="orders-toolbar">
-        <div className="orders-tabs">
-          {tabs.map((tab) => (
-            <button
-              type="button"
-              key={tab.key}
-              className={
-                activeTab === tab.key
-                  ? "orders-tab active"
-                  : "orders-tab"
-              }
-              onClick={() => setActiveTab(tab.key)}
-            >
-              {tab.label}
-              <span>{counts[tab.key]}</span>
+        <div className="tabs mt-24">
+          {TABS.map((t) => (
+            <button key={t.id} className={cx("tab", tab === t.id && "active")} onClick={() => setTab(t.id)}>
+              {t.label} <span className="count">{counts[t.id] || 0}</span>
             </button>
           ))}
         </div>
 
-        <div className="orders-controls">
-          <label className="orders-search">
-            <Search size={17} />
-            <input
-              type="search"
-              value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder="Search order, product or AWB"
-            />
-          </label>
-
-          <select
-            value={sort}
-            onChange={(event) =>
-              setSort(event.target.value)
-            }
-            className="orders-sort"
-          >
-            <option value="newest">Newest First</option>
-            <option value="price-high">
-              Highest Amount
-            </option>
-            <option value="price-low">
-              Lowest Amount
-            </option>
+        <div className="orders-filters">
+          <div className="input-group grow" style={{ maxWidth: 420 }}>
+            <span className="addon">
+              <Search size={15} />
+            </span>
+            <input className="input" placeholder="Search by order ID, product, brand or SKU" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <select className="select" style={{ width: "auto" }} value={range} onChange={(e) => setRange(e.target.value)}>
+            {RANGES.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+          <select className="select" style={{ width: "auto" }} value={pay} onChange={(e) => setPay(e.target.value)}>
+            <option value="all">All payments</option>
+            <option value="prepaid">Prepaid</option>
+            <option value="cod">Cash on Delivery</option>
           </select>
         </div>
-      </section>
 
-      <section className="orders-results">
-        <div className="orders-results-top">
-          <div>
-            <h2>
-              {activeTab === "All"
-                ? "All Orders"
-                : activeTab}
-            </h2>
-            <span>
-              {filteredOrders.length}{" "}
-              {filteredOrders.length === 1
-                ? "order"
-                : "orders"}{" "}
-              found
-            </span>
+        {list.length ? (
+          <div className="col gap-16">
+            {list.map((o) => {
+              const status = o.live;
+              const dAt = deliveredAt(o, now);
+              const retryable = status === "payment_failed" && Date.now() - o.createdAt < 60 * 60000;
+              return (
+                <article key={o.id} className="order-card">
+                  <header className="order-head">
+                    <div className="order-meta">
+                      <div>
+                        <span className="xs muted">Order placed</span>
+                        <b className="small">{formatDate(o.createdAt)}</b>
+                      </div>
+                      <div>
+                        <span className="xs muted">Total</span>
+                        <b className="small">{formatINR(o.pricing.total)}</b>
+                      </div>
+                      <div>
+                        <span className="xs muted">Payment</span>
+                        <b className="small row gap-4">
+                          <CreditCard size={13} /> {o.payment.method === "cod" ? "COD" : o.payment.method.toUpperCase()}
+                        </b>
+                      </div>
+                      <div>
+                        <span className="xs muted">Ship to</span>
+                        <b className="small">{o.address.name.split(" ")[0]} · {o.address.city}</b>
+                      </div>
+                    </div>
+                    <div className="row gap-6">
+                      <span className="xs muted">#{o.id}</span>
+                      <StatusPill status={status} />
+                    </div>
+                  </header>
+
+                  <div className="order-body">
+                    <div className="order-items">
+                      {o.items.slice(0, 3).map((i) => (
+                        <Link key={i.lineId} to={`/product/${i.productId}`} className="order-item">
+                          <Img src={i.image} alt="" className="order-img" label={i.brand} />
+                          <div style={{ minWidth: 0 }}>
+                            <b className="small">{i.brand}</b>
+                            <div className="xs muted ellipsis">{i.name}</div>
+                            <div className="xs faint">{[i.size && `Size ${i.size}`, i.color, `Qty ${i.qty}`].filter(Boolean).join(" · ")}</div>
+                          </div>
+                        </Link>
+                      ))}
+                      {o.items.length > 3 ? <span className="xs muted">+{o.items.length - 3} more</span> : null}
+                    </div>
+
+                    <div className="order-status">
+                      {status === "delivered" ? (
+                        <p className="small">
+                          <b className="text-green">Delivered on {formatDate(dAt, { year: false })}</b>
+                        </p>
+                      ) : status === "cancelled" ? (
+                        <p className="small">
+                          <b className="muted">Cancelled</b>
+                          {o.payment.status === "refund_initiated" || o.payment.status === "refunded" ? <span className="xs muted" style={{ display: "block" }}>Refund {o.payment.status.replace("_", " ")}</span> : null}
+                        </p>
+                      ) : status === "payment_failed" ? (
+                        <p className="small">
+                          <b className="text-red">Payment not completed</b>
+                          <span className="xs muted" style={{ display: "block" }}>Stock released. {retryable ? "You can retry now." : "Place the order again."}</span>
+                        </p>
+                      ) : status === "returned" || status === "return_requested" ? (
+                        <p className="small">
+                          <b className="text-orange">{ORDER_STATUS[status].label}</b>
+                        </p>
+                      ) : (
+                        <p className="small">
+                          Arriving <b className="text-green">{dayLabel(orderEta(o))}</b>
+                          {o.shipments.length > 1 ? <span className="xs muted"> · {o.shipments.length} shipments</span> : null}
+                        </p>
+                      )}
+                      {o.shipments.length && !["cancelled", "payment_failed"].includes(status) ? (
+                        <div className="col gap-6 mt-8">
+                          {o.shipments.map((s) => (
+                            <ShipmentProgress key={s.id} shipment={s} now={now} compact />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="order-actions">
+                      {["confirmed", "processing", "shipped", "out_for_delivery"].includes(status) ? (
+                        <Link to={`/orders/${o.id}`} className="btn btn-sm">
+                          <Truck size={14} /> Track order
+                        </Link>
+                      ) : null}
+                      {retryable ? (
+                        <Link to={`/orders/${o.id}`} className="btn btn-sm btn-blue">
+                          <RefreshCcw size={14} /> Retry payment
+                        </Link>
+                      ) : null}
+                      <Link to={`/orders/${o.id}`} className="btn btn-sm btn-outline">
+                        View details <ChevronRight size={14} />
+                      </Link>
+                      {!["payment_failed", "pending_payment"].includes(status) ? (
+                        <button className="btn btn-sm btn-outline" onClick={() => setInvoice(o)}>
+                          <FileText size={14} /> Invoice
+                        </button>
+                      ) : null}
+                      {status === "delivered" ? (
+                        <>
+                          <Link to={`/returns?order=${o.id}`} className="btn btn-sm btn-outline">
+                            <RotateCcw size={14} /> Return / exchange
+                          </Link>
+                          <Link to={`/orders/${o.id}#review`} className="btn btn-sm btn-outline">
+                            <Star size={14} /> Rate & review
+                          </Link>
+                        </>
+                      ) : null}
+                      {canCancel({ ...o, status }) ? (
+                        <button className="btn btn-sm btn-ghost text-red" onClick={() => setCancel(o)}>
+                          <XCircle size={14} /> Cancel
+                        </button>
+                      ) : null}
+                      <button className="btn btn-sm btn-soft" onClick={() => buyAgain(o)}>
+                        <ShoppingBag size={14} /> Buy again
+                      </button>
+                      <button className="btn btn-sm btn-ghost" onClick={() => setSupport(o)}>
+                        <HelpCircle size={14} /> Help
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="orders-clear-search"
-            >
-              Clear search
-            </button>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="orders-loading">
-            <div className="orders-loading-spinner" />
-            <span>Loading your orders...</span>
-          </div>
-        ) : filteredOrders.length === 0 ? (
-          <EmptyOrders
-            activeTab={activeTab}
-            onShop={onShop}
-          />
         ) : (
-          <div className="orders-list">
-            {filteredOrders.map((order) => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onViewDetails={onViewDetails}
-                onTrackOrder={onTrackOrder}
-                onBuyAgain={onBuyAgain}
-                onReturn={onReturn}
-                onReview={onReview}
-              />
-            ))}
-          </div>
+          <Empty
+            icon={<Package size={34} />}
+            title={mine.length ? "No orders match" : "No orders yet"}
+            text={mine.length ? "Try a different tab, date range or search." : "When you place an order, it'll show up here with live tracking."}
+            action={<Link to="/shop" className="btn">Start shopping</Link>}
+          />
         )}
-      </section>
-
-      <section className="orders-trust">
-        <div className="orders-trust-item">
-          <div>
-            <MapPin size={18} />
-          </div>
-          <span>
-            Delivery updates are linked to your order
-            address.
-          </span>
-        </div>
-
-        <div className="orders-trust-item">
-          <div>
-            <Truck size={18} />
-          </div>
-          <span>
-            Shipment tracking updates appear as your
-            package moves.
-          </span>
-        </div>
-
-        <div className="orders-trust-item">
-          <div>
-            <CheckCircle2 size={18} />
-          </div>
-          <span>
-            Payment and refund information stays attached
-            to each order.
-          </span>
-        </div>
-      </section>
-
-      <div className="orders-profile-mini">
-        <div className="orders-profile-avatar">
-          {getInitials("Priyank Raj")}
-        </div>
-
-        <div>
-          <strong>Need help with an order?</strong>
-          <span>
-            Our support team can help with delivery,
-            returns and payments.
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            (window.location.href = "/help")
-          }
-        >
-          Get Help
-          <ChevronRight size={16} />
-        </button>
       </div>
-    </main>
+      <InvoiceModal order={invoice} open={!!invoice} onClose={() => setInvoice(null)} />
+      <CancelModal key={cancel?.id} order={cancel} open={!!cancel} onClose={() => setCancel(null)} />
+      <SupportModal order={support} user={user} open={!!support} onClose={() => setSupport(null)} />
+    </div>
   );
 }
