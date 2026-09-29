@@ -21,7 +21,7 @@ export function ReviewForm({ product, open, onClose }) {
       toast.error("Please write at least 10 characters");
       return;
     }
-    addReview(product.id, { name: user?.name || "Customer", city: "India", rating, title: title || (rating >= 4 ? "Loved it" : "Honest review"), text, fit });
+    addReview(product.id, { userId: user?.id, name: user?.name || "Customer", city: "India", rating, title: title || (rating >= 4 ? "Loved it" : "Honest review"), text, fit });
     toast("Thanks! Your review is live 🎉");
     onClose();
     setText("");
