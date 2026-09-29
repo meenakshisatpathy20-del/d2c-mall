@@ -1,1296 +1,270 @@
-import { motion } from "framer-motion";
-import {
-  ArrowDownUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Download,
-  Eye,
-  Filter,
-  MapPin,
-  Package,
-  Search,
-  Truck,
-  UserRound,
-  X,
-} from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api, live, useBackend } from "../../lib/api";
+import { useSearchParams } from "react-router-dom";
+import { Download, FastForward, Pause, Search, Truck, X, XCircle, AlertTriangle, RefreshCcw } from "lucide-react";
+import { useStore } from "../../lib/store";
+import { couriers, getCourier, getWarehouse, warehouses } from "../../data/logistics";
+import { ORDER_STATUS, SHIPMENT_LABEL, deriveOrderStatus, shipmentStatus } from "../../lib/orderModel";
+import { adminShipmentAction, cancelOrder } from "../../lib/services/orders";
+import { useNow } from "../../lib/services/liveSync";
+import { cx, formatDateTime, formatINR } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { Drawer, Img, StatusPill } from "../common/ui";
+import { ShipmentEvents, ShipmentProgress } from "../order/OrderBits";
+import { AdminHeader, exportCsv } from "./AdminBits";
+import { scopeOrders } from "./AdminDashboard";
 import "./AdminOrdersPage.css";
 
-const INITIAL_ORDERS = [
-  {
-    id: "D2C24092381",
-    customer: "Aarohi Sharma",
-    phone: "+91 98765 42108",
-    email: "aarohi@example.com",
-    items: [
-      {
-        name: "Relaxed Fit Cotton Shirt",
-        sku: "D2C-SHIRT-001",
-        qty: 1,
-        price: 899,
-        size: "M",
-        color: "White",
-      },
-      {
-        name: "Minimal Gold-Tone Necklace",
-        sku: "D2C-NECK-001",
-        qty: 1,
-        price: 799,
-        size: "One Size",
-        color: "Gold",
-      },
-    ],
-    amount: 1698,
-    payment: "Paid",
-    paymentMethod: "UPI",
-    status: "Shipped",
-    warehouse: "Bhiwandi",
-    carrier: "Delhivery",
-    awb: "DLV784321905",
-    orderDate: "23 Sep 2026, 08:42 PM",
-    delivery: "27 Sep 2026",
-    address: "Bandra West, Mumbai, Maharashtra",
-  },
-  {
-    id: "D2C24092380",
-    customer: "Rohan Mehta",
-    phone: "+91 98111 23891",
-    email: "rohan@example.com",
-    items: [
-      {
-        name: "Premium Oversized T-Shirt",
-        sku: "D2C-TSHIRT-001",
-        qty: 1,
-        price: 699,
-        size: "L",
-        color: "Black",
-      },
-    ],
-    amount: 699,
-    payment: "Paid",
-    paymentMethod: "Card",
-    status: "Processing",
-    warehouse: "Delhi NCR",
-    carrier: "",
-    awb: "",
-    orderDate: "23 Sep 2026, 08:36 PM",
-    delivery: "28 Sep 2026",
-    address: "Gurugram, Haryana",
-  },
-  {
-    id: "D2C24092379",
-    customer: "Ananya Singh",
-    phone: "+91 99100 78211",
-    email: "ananya@example.com",
-    items: [
-      {
-        name: "Hydrating Glow Face Serum",
-        sku: "D2C-SERUM-001",
-        qty: 1,
-        price: 549,
-        size: "30ml",
-        color: "Natural",
-      },
-      {
-        name: "Everyday Street Sneakers",
-        sku: "D2C-SNEAK-001",
-        qty: 1,
-        price: 1499,
-        size: "7",
-        color: "White",
-      },
-      {
-        name: "Minimal Gold-Tone Necklace",
-        sku: "D2C-NECK-001",
-        qty: 1,
-        price: 799,
-        size: "One Size",
-        color: "Gold",
-      },
-    ],
-    amount: 2847,
-    payment: "Paid",
-    paymentMethod: "UPI",
-    status: "Out for Delivery",
-    warehouse: "Bengaluru",
-    carrier: "Delhivery",
-    awb: "DLV784321776",
-    orderDate: "23 Sep 2026, 07:59 PM",
-    delivery: "24 Sep 2026",
-    address: "Indiranagar, Bengaluru, Karnataka",
-  },
-  {
-    id: "D2C24092378",
-    customer: "Kabir Verma",
-    phone: "+91 98710 44021",
-    email: "kabir@example.com",
-    items: [
-      {
-        name: "Everyday Street Sneakers",
-        sku: "D2C-SNEAK-001",
-        qty: 1,
-        price: 1499,
-        size: "9",
-        color: "Black",
-      },
-    ],
-    amount: 1499,
-    payment: "Pending",
-    paymentMethod: "COD",
-    status: "Processing",
-    warehouse: "Jaipur",
-    carrier: "",
-    awb: "",
-    orderDate: "23 Sep 2026, 07:44 PM",
-    delivery: "29 Sep 2026",
-    address: "Vaishali Nagar, Jaipur, Rajasthan",
-  },
-  {
-    id: "D2C24092377",
-    customer: "Meher Khan",
-    phone: "+91 98999 11722",
-    email: "meher@example.com",
-    items: [
-      {
-        name: "Flowy Printed Midi Dress",
-        sku: "D2C-DRESS-001",
-        qty: 1,
-        price: 1299,
-        size: "M",
-        color: "Blue",
-      },
-      {
-        name: "Hydrating Glow Face Serum",
-        sku: "D2C-SERUM-001",
-        qty: 1,
-        price: 549,
-        size: "30ml",
-        color: "Natural",
-      },
-    ],
-    amount: 1848,
-    payment: "Paid",
-    paymentMethod: "Card",
-    status: "Delivered",
-    warehouse: "Delhi NCR",
-    carrier: "Blue Dart",
-    awb: "BD784321611",
-    orderDate: "22 Sep 2026, 05:31 PM",
-    delivery: "23 Sep 2026",
-    address: "Noida Sector 62, Uttar Pradesh",
-  },
-  {
-    id: "D2C24092376",
-    customer: "Ishaan Roy",
-    phone: "+91 98311 55208",
-    email: "ishaan@example.com",
-    items: [
-      {
-        name: "Wireless Noise-Cancelling Headphones",
-        sku: "D2C-HEAD-001",
-        qty: 1,
-        price: 2499,
-        size: "One Size",
-        color: "Black",
-      },
-    ],
-    amount: 2499,
-    payment: "Paid",
-    paymentMethod: "UPI",
-    status: "Shipped",
-    warehouse: "Bhiwandi",
-    carrier: "Ecom Express",
-    awb: "EC784321504",
-    orderDate: "22 Sep 2026, 04:18 PM",
-    delivery: "26 Sep 2026",
-    address: "Salt Lake, Kolkata, West Bengal",
-  },
-  {
-    id: "D2C24092375",
-    customer: "Diya Kapoor",
-    phone: "+91 98100 77122",
-    email: "diya@example.com",
-    items: [
-      {
-        name: "Modern Accent Table Lamp",
-        sku: "D2C-LAMP-001",
-        qty: 1,
-        price: 1199,
-        size: "Standard",
-        color: "Beige",
-      },
-    ],
-    amount: 1199,
-    payment: "Paid",
-    paymentMethod: "Card",
-    status: "Cancelled",
-    warehouse: "Jaipur",
-    carrier: "",
-    awb: "",
-    orderDate: "22 Sep 2026, 01:12 PM",
-    delivery: "",
-    address: "Kothrud, Pune, Maharashtra",
-  },
-  {
-    id: "D2C24092374",
-    customer: "Vivaan Patel",
-    phone: "+91 99251 33770",
-    email: "vivaan@example.com",
-    items: [
-      {
-        name: "Relaxed Fit Cotton Shirt",
-        sku: "D2C-SHIRT-001",
-        qty: 2,
-        price: 899,
-        size: "L",
-        color: "Blue",
-      },
-    ],
-    amount: 1798,
-    payment: "Paid",
-    paymentMethod: "UPI",
-    status: "Processing",
-    warehouse: "Bhiwandi",
-    carrier: "",
-    awb: "",
-    orderDate: "22 Sep 2026, 11:47 AM",
-    delivery: "27 Sep 2026",
-    address: "Navrangpura, Ahmedabad, Gujarat",
-  },
-];
-
-const STATUS_OPTIONS = [
-  "All",
-  "Processing",
-  "Shipped",
-  "Out for Delivery",
-  "Delivered",
-  "Cancelled",
-  "Returned",
-];
-
-const PAYMENT_OPTIONS = [
-  "All",
-  "Paid",
-  "Pending",
-  "Failed",
-];
-
-const WAREHOUSE_OPTIONS = [
-  "All",
-  "Bhiwandi",
-  "Delhi NCR",
-  "Jaipur",
-  "Bengaluru",
-];
-
-const SORT_OPTIONS = [
-  {
-    value: "newest",
-    label: "Newest first",
-  },
-  {
-    value: "oldest",
-    label: "Oldest first",
-  },
-  {
-    value: "amount-high",
-    label: "Amount: high to low",
-  },
-  {
-    value: "amount-low",
-    label: "Amount: low to high",
-  },
-];
-
-function StatusBadge({ status }) {
-  const className = status
-    .toLowerCase()
-    .replace(/\s+/g, "-");
-
+export function ShipmentOps({ order, shipment, admin }) {
+  const [courier, setCourier] = useState(shipment.courierId);
+  const status = shipmentStatus(shipment);
+  const done = ["delivered", "cancelled"].includes(status);
+  const canOps = ["super_admin", "logistics", "warehouse_admin"].includes(admin.role);
+  if (!canOps || done) return null;
   return (
-    <span
-      className={`orders-status ${className}`}
-    >
-      <i />
-      {status}
-    </span>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}) {
-  return (
-    <label className="orders-filter-select">
-      <span>{label}</span>
-
-      <div>
-        <select
-          value={value}
-          onChange={(event) =>
-            onChange(event.target.value)
-          }
-        >
-          {options.map((option) => (
-            <option
-              value={option}
-              key={option}
-            >
-              {option}
-            </option>
+    <div className="ship-ops">
+      <button className="btn btn-xs btn-soft" onClick={() => { adminShipmentAction(order.id, shipment.id, "advance"); toast("Shipment advanced to next status"); }}>
+        <FastForward size={12} /> Advance status
+      </button>
+      <button className="btn btn-xs btn-outline" onClick={() => { adminShipmentAction(order.id, shipment.id, "fail", { reason: "Customer not available at address" }); toast("Marked failed attempt · re-attempt scheduled"); }}>
+        <AlertTriangle size={12} /> Mark failed attempt
+      </button>
+      <button className="btn btn-xs btn-outline" onClick={() => { adminShipmentAction(order.id, shipment.id, "hold"); toast(shipment.frozen ? "Shipment resumed" : "Shipment put on hold"); }}>
+        <Pause size={12} /> {shipment.frozen ? "Resume" : "Hold"}
+      </button>
+      <span className="row gap-4">
+        <select className="select" style={{ height: 28, minHeight: 28, padding: "0 8px", width: "auto", fontSize: 12 }} value={courier} onChange={(e) => setCourier(e.target.value)}>
+          {couriers.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
-
-        <ChevronDown size={13} />
-      </div>
-    </label>
+        <button className="btn btn-xs btn-outline" disabled={courier === shipment.courierId} onClick={() => { adminShipmentAction(order.id, shipment.id, "reassign", { courierId: courier }); toast(`Reassigned to ${getCourier(courier).name} · new AWB generated`); }}>
+          <RefreshCcw size={12} /> Reassign
+        </button>
+      </span>
+    </div>
   );
 }
 
-function OrderDetails({
-  order,
-  onClose,
-  onStatusChange,
-}) {
-  if (!order) {
-    return null;
-  }
-
+function OrderDrawer({ order, onClose, admin, now }) {
+  if (!order) return null;
+  const status = deriveOrderStatus(order, now);
   return (
-    <motion.aside
-      className="order-details-drawer"
-      initial={{
-        x: "100%",
-      }}
-      animate={{
-        x: 0,
-      }}
-      exit={{
-        x: "100%",
-      }}
-    >
-      <div className="order-details-header">
+    <div className="adm-drawer">
+      <div className="adm-drawer-head">
         <div>
-          <span>ORDER DETAILS</span>
-          <h2>{order.id}</h2>
+          <b>Order {order.id}</b>
+          <div className="xs muted">{formatDateTime(order.createdAt)}</div>
         </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      <div className="order-details-body">
-        <section className="order-detail-status">
-          <div>
-            <StatusBadge
-              status={order.status}
-            />
-
-            <span>
-              Placed {order.orderDate}
-            </span>
-          </div>
-
-          <div className="order-status-actions">
-            <label>
-              Update status
-
-              <select
-                value={order.status}
-                onChange={(event) =>
-                  onStatusChange?.(
-                    order.id,
-                    event.target.value
-                  )
-                }
-              >
-                {STATUS_OPTIONS.filter(
-                  (item) =>
-                    item !== "All"
-                ).map((status) => (
-                  <option
-                    value={status}
-                    key={status}
-                  >
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </section>
-
-        <section className="order-detail-block">
-          <header>
-            <UserRound size={15} />
-            <span>Customer</span>
-          </header>
-
-          <div className="order-customer-detail">
-            <strong>
-              {order.customer}
-            </strong>
-
-            <span>{order.phone}</span>
-            <span>{order.email}</span>
-            <p>
-              <MapPin size={13} />
-              {order.address}
-            </p>
-          </div>
-        </section>
-
-        <section className="order-detail-block">
-          <header>
-            <Package size={15} />
-            <span>Items</span>
-          </header>
-
-          <div className="order-items-list">
-            {order.items.map(
-              (item, index) => (
-                <article
-                  key={`${item.sku}-${index}`}
-                >
-                  <div className="order-item-image">
-                    <Package size={18} />
-                  </div>
-
-                  <div>
-                    <strong>
-                      {item.name}
-                    </strong>
-
-                    <span>
-                      {item.sku}
-                    </span>
-
-                    <small>
-                      {item.size} ·{" "}
-                      {item.color} · Qty{" "}
-                      {item.qty}
-                    </small>
-                  </div>
-
-                  <strong>
-                    ₹
-                    {(
-                      item.price *
-                      item.qty
-                    ).toLocaleString(
-                      "en-IN"
-                    )}
-                  </strong>
-                </article>
-              )
-            )}
-          </div>
-        </section>
-
-        <section className="order-detail-block">
-          <header>
-            <Truck size={15} />
-            <span>Fulfilment</span>
-          </header>
-
-          <div className="order-fulfilment-grid">
-            <div>
-              <span>Warehouse</span>
-              <strong>
-                {order.warehouse}
-              </strong>
-            </div>
-
-            <div>
-              <span>Carrier</span>
-              <strong>
-                {order.carrier ||
-                  "Not assigned"}
-              </strong>
-            </div>
-
-            <div>
-              <span>AWB</span>
-              <strong>
-                {order.awb ||
-                  "Not generated"}
-              </strong>
-            </div>
-
-            <div>
-              <span>Expected delivery</span>
-              <strong>
-                {order.delivery ||
-                  "Pending"}
-              </strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="order-detail-block">
-          <header>
-            <Clock3 size={15} />
-            <span>Payment</span>
-          </header>
-
-          <div className="order-payment-summary">
-            <div>
-              <span>Status</span>
-              <StatusBadge
-                status={order.payment}
-              />
-            </div>
-
-            <div>
-              <span>Method</span>
-              <strong>
-                {order.paymentMethod}
-              </strong>
-            </div>
-
-            <div>
-              <span>Order total</span>
-              <strong>
-                ₹
-                {order.amount.toLocaleString(
-                  "en-IN"
-                )}
-              </strong>
-            </div>
-          </div>
-        </section>
-
-        <section className="order-detail-actions">
-          <button type="button">
-            <Truck size={14} />
-            Manage shipment
-          </button>
-
-          <button type="button">
-            <Download size={14} />
-            Download invoice
-          </button>
-        </section>
-      </div>
-    </motion.aside>
-  );
-}
-
-export default function AdminOrdersPage({
-  orders: externalOrders,
-  onOrderStatusChange,
-  onExport,
-}) {
-  const [orders, setOrders] =
-    useState(
-      externalOrders || INITIAL_ORDERS
-    );
-
-  const [search, setSearch] =
-    useState("");
-
-  const [status, setStatus] =
-    useState("All");
-
-  const [payment, setPayment] =
-    useState("All");
-
-  const [warehouse, setWarehouse] =
-    useState("All");
-
-  const [sort, setSort] =
-    useState("newest");
-
-  const [page, setPage] =
-    useState(1);
-
-  const [pageSize, setPageSize] =
-    useState(6);
-
-  const [selectedOrder, setSelectedOrder] =
-    useState(null);
-
-  const [mobileFilters, setMobileFilters] =
-    useState(false);
-
-  const filteredOrders =
-    useMemo(() => {
-      const query =
-        search.trim().toLowerCase();
-
-      const result = orders.filter(
-        (order) => {
-          const matchesSearch =
-            !query ||
-            `${order.id} ${order.customer} ${order.phone} ${order.email} ${order.warehouse} ${order.awb}`
-              .toLowerCase()
-              .includes(query);
-
-          const matchesStatus =
-            status === "All" ||
-            order.status === status;
-
-          const matchesPayment =
-            payment === "All" ||
-            order.payment === payment;
-
-          const matchesWarehouse =
-            warehouse === "All" ||
-            order.warehouse ===
-              warehouse;
-
-          return (
-            matchesSearch &&
-            matchesStatus &&
-            matchesPayment &&
-            matchesWarehouse
-          );
-        }
-      );
-
-      return [...result].sort(
-        (a, b) => {
-          if (sort === "amount-high") {
-            return b.amount - a.amount;
-          }
-
-          if (sort === "amount-low") {
-            return a.amount - b.amount;
-          }
-
-          const dateA =
-            new Date(a.orderDate).getTime();
-          const dateB =
-            new Date(b.orderDate).getTime();
-
-          if (sort === "oldest") {
-            return dateA - dateB;
-          }
-
-          return dateB - dateA;
-        }
-      );
-    }, [
-      orders,
-      search,
-      status,
-      payment,
-      warehouse,
-      sort,
-    ]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(
-      filteredOrders.length /
-        pageSize
-    )
-  );
-
-  const currentPage =
-    Math.min(page, totalPages);
-
-  const visibleOrders =
-    filteredOrders.slice(
-      (currentPage - 1) *
-        pageSize,
-      currentPage * pageSize
-    );
-
-  const updateStatus = (
-    orderId,
-    nextStatus
-  ) => {
-    setOrders((current) =>
-      current.map((order) =>
-        order.id === orderId
-          ? {
-              ...order,
-              status: nextStatus,
-            }
-          : order
-      )
-    );
-
-    setSelectedOrder((current) =>
-      current?.id === orderId
-        ? {
-            ...current,
-            status: nextStatus,
-          }
-        : current
-    );
-
-    onOrderStatusChange?.(
-      orderId,
-      nextStatus
-    );
-  };
-
-  const resetFilters = () => {
-    setSearch("");
-    setStatus("All");
-    setPayment("All");
-    setWarehouse("All");
-    setSort("newest");
-    setPage(1);
-  };
-
-  const hasFilters =
-    search ||
-    status !== "All" ||
-    payment !== "All" ||
-    warehouse !== "All";
-
-  const orderStats = useMemo(
-    () => ({
-      total: orders.length,
-      processing: orders.filter(
-        (order) =>
-          order.status ===
-          "Processing"
-      ).length,
-      shipped: orders.filter(
-        (order) =>
-          order.status === "Shipped"
-      ).length,
-      transit: orders.filter(
-        (order) =>
-          order.status ===
-          "Out for Delivery"
-      ).length,
-      delivered: orders.filter(
-        (order) =>
-          order.status === "Delivered"
-      ).length,
-    }),
-    [orders]
-  );
-
-  return (
-    <main className="admin-orders-page">
-      <div className="admin-orders-heading">
-        <div>
-          <span>ORDER MANAGEMENT</span>
-
-          <h1>Orders</h1>
-
-          <p>
-            Manage customer orders, payment state and
-            fulfilment from one place.
-          </p>
-        </div>
-
-        <div className="admin-orders-heading-actions">
-          <button
-            type="button"
-            onClick={() =>
-              onExport?.(filteredOrders)
-            }
-          >
-            <Download size={14} />
-            Export orders
-          </button>
+        <div className="row gap-6">
+          <StatusPill status={status} />
+          <button className="icon-btn sm" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
       </div>
-
-      <section className="orders-stat-strip">
-        <div>
-          <span>ALL ORDERS</span>
-          <strong>
-            {orderStats.total}
-          </strong>
+      <div className="adm-drawer-body">
+        <div className="grid grid-2">
+          <div className="soft-panel">
+            <span className="label">Customer</span>
+            <div className="small mt-4"><b>{order.customer}</b></div>
+            <div className="xs muted">{order.address.phone} · {order.email || "—"}</div>
+            <div className="xs muted mt-4">{order.address.line1}, {order.address.city} {order.address.pincode}</div>
+          </div>
+          <div className="soft-panel">
+            <span className="label">Payment</span>
+            <div className="small mt-4"><b>{formatINR(order.pricing.total)}</b> · {order.payment.method.toUpperCase()}</div>
+            <div className="xs muted" style={{ textTransform: "capitalize" }}>{order.payment.status.replace(/_/g, " ")}</div>
+            {order.payment.razorpayPaymentId ? <div className="xs muted">{order.payment.razorpayPaymentId} {order.payment.signatureVerified ? "· ✓ signature" : ""}</div> : null}
+          </div>
         </div>
 
         <div>
-          <span>PROCESSING</span>
-          <strong>
-            {orderStats.processing}
-          </strong>
+          <span className="label">Items</span>
+          <div className="col gap-6 mt-8">
+            {order.items.map((i) => (
+              <div key={i.lineId} className="row gap-10">
+                <Img src={i.image} alt="" label="" style={{ width: 40, height: 48, borderRadius: 8 }} />
+                <div className="grow small">
+                  <b>{i.name}</b>
+                  <div className="xs muted">{i.sku} · {[i.size, i.color].filter(Boolean).join(" · ")} · Qty {i.qty}</div>
+                </div>
+                <b className="small">{formatINR(i.price * i.qty)}</b>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {order.shipments.map((s) => (
+          <div key={s.id} className="ship-card">
+            <div className="row between wrap gap-6">
+              <b className="small row gap-6">
+                <Truck size={15} /> {s.id} · {getWarehouse(s.warehouseId).short} → {order.address.city}
+              </b>
+              <span className="xs muted">{getCourier(s.courierId).name} · AWB {s.awb}</span>
+            </div>
+            <ShipmentProgress shipment={s} now={now} />
+            <ShipmentOps order={order} shipment={s} admin={admin} />
+            <details className="mt-12">
+              <summary className="link xs">Event log</summary>
+              <div className="mt-12">
+                <ShipmentEvents shipment={s} now={now} city={order.address.city} />
+              </div>
+            </details>
+          </div>
+        ))}
 
         <div>
-          <span>SHIPPED</span>
-          <strong>
-            {orderStats.shipped}
-          </strong>
+          <span className="label">Timeline</span>
+          <div className="col gap-6 mt-8">
+            {order.timeline.map((t) => (
+              <div key={`${t.status}${t.at}`} className="xs">
+                <b>{formatDateTime(t.at)}</b> — {t.note}
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div>
-          <span>OUT FOR DELIVERY</span>
-          <strong>
-            {orderStats.transit}
-          </strong>
-        </div>
-
-        <div>
-          <span>DELIVERED</span>
-          <strong>
-            {orderStats.delivered}
-          </strong>
-        </div>
-      </section>
-
-      <section className="orders-toolbar">
-        <div className="orders-search">
-          <Search size={15} />
-
-          <input
-            value={search}
-            onChange={(event) => {
-              setSearch(
-                event.target.value
-              );
-              setPage(1);
-            }}
-            placeholder="Search order ID, customer, phone, AWB..."
-          />
-        </div>
-
-        <div className="orders-toolbar-filters">
-          <FilterSelect
-            label="Status"
-            value={status}
-            options={STATUS_OPTIONS}
-            onChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
-          />
-
-          <FilterSelect
-            label="Payment"
-            value={payment}
-            options={PAYMENT_OPTIONS}
-            onChange={(value) => {
-              setPayment(value);
-              setPage(1);
-            }}
-          />
-
-          <FilterSelect
-            label="Warehouse"
-            value={warehouse}
-            options={WAREHOUSE_OPTIONS}
-            onChange={(value) => {
-              setWarehouse(value);
-              setPage(1);
-            }}
-          />
-
-          <FilterSelect
-            label="Sort"
-            value={sort}
-            options={SORT_OPTIONS.map(
-              (item) => item.label
-            )}
-            onChange={(label) => {
-              const selected =
-                SORT_OPTIONS.find(
-                  (item) =>
-                    item.label ===
-                    label
-                );
-
-              setSort(
-                selected?.value ||
-                  "newest"
-              );
-
-              setPage(1);
-            }}
-          />
-        </div>
-
-        <button
-          type="button"
-          className="orders-mobile-filter-button"
-          onClick={() =>
-            setMobileFilters(
-              (current) =>
-                !current
-            )
-          }
-        >
-          <Filter size={14} />
-          Filters
-        </button>
-      </section>
-
-      {hasFilters && (
-        <div className="orders-active-filters">
-          <span>
-            {filteredOrders.length} matching
-            orders
-          </span>
-
+        {["super_admin", "support"].includes(admin.role) && !["cancelled", "delivered", "returned", "payment_failed"].includes(status) ? (
           <button
-            type="button"
-            onClick={resetFilters}
-          >
-            Clear filters
-            <X size={12} />
-          </button>
-        </div>
-      )}
-
-      <section className="admin-orders-table-panel">
-        <div className="orders-table-wrapper">
-          <table className="admin-orders-table">
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    aria-label="Select all orders"
-                  />
-                </th>
-                <th>ORDER</th>
-                <th>CUSTOMER</th>
-                <th>ITEMS</th>
-                <th>AMOUNT</th>
-                <th>PAYMENT</th>
-                <th>FULFILMENT</th>
-                <th>WAREHOUSE</th>
-                <th>ORDERED</th>
-                <th />
-              </tr>
-            </thead>
-
-            <tbody>
-              {visibleOrders.map(
-                (order) => (
-                  <tr
-                    key={order.id}
-                    onClick={() =>
-                      setSelectedOrder(
-                        order
-                      )
-                    }
-                  >
-                    <td
-                      onClick={(event) =>
-                        event.stopPropagation()
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${order.id}`}
-                      />
-                    </td>
-
-                    <td>
-                      <strong>
-                        {order.id}
-                      </strong>
-
-                      <small>
-                        {order.items.length}{" "}
-                        {order.items.length ===
-                        1
-                          ? "product"
-                          : "products"}
-                      </small>
-                    </td>
-
-                    <td>
-                      <strong>
-                        {order.customer}
-                      </strong>
-
-                      <small>
-                        {order.phone}
-                      </small>
-                    </td>
-
-                    <td>
-                      {order.items.reduce(
-                        (
-                          total,
-                          item
-                        ) =>
-                          total +
-                          item.qty,
-                        0
-                      )}
-                    </td>
-
-                    <td>
-                      <strong>
-                        ₹
-                        {order.amount.toLocaleString(
-                          "en-IN"
-                        )}
-                      </strong>
-                    </td>
-
-                    <td>
-                      <StatusBadge
-                        status={
-                          order.payment
-                        }
-                      />
-
-                      <small>
-                        {order.paymentMethod}
-                      </small>
-                    </td>
-
-                    <td>
-                      <StatusBadge
-                        status={
-                          order.status
-                        }
-                      />
-
-                      {order.awb && (
-                        <small className="order-awb">
-                          {order.awb}
-                        </small>
-                      )}
-                    </td>
-
-                    <td>
-                      <span className="order-warehouse">
-                        <MapPin size={11} />
-                        {order.warehouse}
-                      </span>
-                    </td>
-
-                    <td>
-                      <span className="order-date">
-                        <Clock3 size={11} />
-                        {order.orderDate}
-                      </span>
-                    </td>
-
-                    <td>
-                      <button
-                        type="button"
-                        className="order-view-button"
-                        onClick={(
-                          event
-                        ) => {
-                          event.stopPropagation();
-                          setSelectedOrder(
-                            order
-                          );
-                        }}
-                      >
-                        <Eye size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                )
-              )}
-
-              {visibleOrders.length ===
-                0 && (
-                <tr>
-                  <td
-                    colSpan="10"
-                    className="orders-empty"
-                  >
-                    <Search size={25} />
-
-                    <strong>
-                      No orders found
-                    </strong>
-
-                    <span>
-                      Try changing your search
-                      or filters.
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={
-                        resetFilters
-                      }
-                    >
-                      Clear filters
-                    </button>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <footer className="orders-pagination">
-          <div>
-            Showing{" "}
-            <strong>
-              {visibleOrders.length}
-            </strong>{" "}
-            of{" "}
-            <strong>
-              {filteredOrders.length}
-            </strong>{" "}
-            orders
-          </div>
-
-          <div>
-            <label>
-              Rows
-              <select
-                value={pageSize}
-                onChange={(event) => {
-                  setPageSize(
-                    Number(
-                      event.target.value
-                    )
-                  );
-                  setPage(1);
-                }}
-              >
-                <option value="6">
-                  6
-                </option>
-                <option value="10">
-                  10
-                </option>
-                <option value="20">
-                  20
-                </option>
-              </select>
-            </label>
-
-            <button
-              type="button"
-              disabled={
-                currentPage === 1
-              }
-              onClick={() =>
-                setPage(
-                  (current) =>
-                    Math.max(
-                      1,
-                      current - 1
-                    )
-                )
-              }
-            >
-              <ChevronLeft size={14} />
-            </button>
-
-            <span>
-              {currentPage} /{" "}
-              {totalPages}
-            </span>
-
-            <button
-              type="button"
-              disabled={
-                currentPage ===
-                totalPages
-              }
-              onClick={() =>
-                setPage(
-                  (current) =>
-                    Math.min(
-                      totalPages,
-                      current + 1
-                    )
-                )
-              }
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </footer>
-      </section>
-
-      {mobileFilters && (
-        <motion.div
-          className="orders-mobile-filters"
-          initial={{
-            opacity: 0,
-          }}
-          animate={{
-            opacity: 1,
-          }}
-        >
-          <div className="orders-mobile-filter-head">
-            <strong>Filters</strong>
-
-            <button
-              type="button"
-              onClick={() =>
-                setMobileFilters(
-                  false
-                )
-              }
-            >
-              <X size={17} />
-            </button>
-          </div>
-
-          <FilterSelect
-            label="Status"
-            value={status}
-            options={STATUS_OPTIONS}
-            onChange={setStatus}
-          />
-
-          <FilterSelect
-            label="Payment"
-            value={payment}
-            options={PAYMENT_OPTIONS}
-            onChange={setPayment}
-          />
-
-          <FilterSelect
-            label="Warehouse"
-            value={warehouse}
-            options={WAREHOUSE_OPTIONS}
-            onChange={setWarehouse}
-          />
-
-          <button
-            type="button"
+            className="btn btn-red"
             onClick={() => {
-              resetFilters();
-              setMobileFilters(
-                false
-              );
+              const r = cancelOrder(order.id, "Cancelled by operations", "admin");
+              r.ok ? toast("Order cancelled, stock restored, refund initiated") : toast.error(r.error);
             }}
           >
-            Apply filters
+            <XCircle size={15} /> Cancel order & refund
           </button>
-        </motion.div>
-      )}
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
-      {selectedOrder && (
-        <>
-          <div
-            className="order-details-backdrop"
+export default function AdminOrdersPage({ admin }) {
+  const all = useStore((s) => s.orders);
+  const now = useNow(8000);
+  const [params] = useSearchParams();
+  const [q, setQ] = useState(params.get("q") || "");
+  const [status, setStatus] = useState("all");
+  const [pay, setPay] = useState("all");
+  const [wh, setWh] = useState(admin.warehouseId || "all");
+  const [openId, setOpenId] = useState(params.get("q") || null);
+
+  const backend = useBackend();
+  const serverToken = useStore((s) => s.adminSession?.serverToken);
+  const [serverOrders, setServerOrders] = useState([]);
+  useEffect(() => {
+    if (!backend.available || !live("db") || !serverToken) return;
+    api("/admin/orders?limit=100")
+      .then((r) => setServerOrders((r.orders || []).map((o) => ({ ...o, fromServer: true, shipments: o.shipments || [], timeline: o.timeline || [], customer: o.customer || o.address?.name || "Customer" }))))
+      .catch(() => {});
+  }, [backend, serverToken]);
+  const merged = useMemo(() => [...serverOrders.filter((so) => !all.some((o) => o.id === so.id)), ...all], [serverOrders, all]);
+  const orders = useMemo(() => scopeOrders(merged, admin).map((o) => ({ ...o, live: deriveOrderStatus(o, now) })), [merged, admin, now]);
+  const list = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return orders.filter((o) => {
+      if (status !== "all" && o.live !== status) return false;
+      if (pay !== "all" && (pay === "cod" ? o.payment.method !== "cod" : o.payment.method === "cod")) return false;
+      if (wh !== "all" && !o.shipments.some((s) => s.warehouseId === wh)) return false;
+      if (!t) return true;
+      return o.id.toLowerCase().includes(t) || o.customer.toLowerCase().includes(t) || o.address.phone.includes(t) || o.items.some((i) => i.sku.toLowerCase().includes(t));
+    });
+  }, [orders, q, status, pay, wh]);
+  const open = orders.find((o) => o.id === openId);
+
+  return (
+    <div className="col gap-16">
+      <AdminHeader
+        eyebrow="Order management"
+        title="Orders"
+        sub={`${list.length} of ${orders.length} orders`}
+        actions={
+          <button
+            className="btn btn-sm btn-outline"
             onClick={() =>
-              setSelectedOrder(null)
+              exportCsv(
+                "orders.csv",
+                list.map((o) => ({ order: o.id, date: new Date(o.createdAt).toISOString(), customer: o.customer, city: o.address.city, items: o.items.length, total: o.pricing.total, payment: o.payment.method, paymentStatus: o.payment.status, status: o.live }))
+              )
             }
-          />
-
-          <OrderDetails
-            order={selectedOrder}
-            onClose={() =>
-              setSelectedOrder(null)
-            }
-            onStatusChange={
-              updateStatus
-            }
-          />
-        </>
-      )}
-    </main>
+          >
+            <Download size={14} /> Export CSV
+          </button>
+        }
+      />
+      <div className="adm-toolbar">
+        <div className="input-group" style={{ flex: 1, minWidth: 220 }}>
+          <span className="addon"><Search size={15} /></span>
+          <input className="input" placeholder="Order ID, customer, phone or SKU" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <select className="select" style={{ width: "auto" }} value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="all">All statuses</option>
+          {Object.entries(ORDER_STATUS).map(([k, v]) => (
+            <option key={k} value={k}>{v.label}</option>
+          ))}
+        </select>
+        <select className="select" style={{ width: "auto" }} value={pay} onChange={(e) => setPay(e.target.value)}>
+          <option value="all">All payments</option>
+          <option value="prepaid">Prepaid</option>
+          <option value="cod">COD</option>
+        </select>
+        <select className="select" style={{ width: "auto" }} value={wh} onChange={(e) => setWh(e.target.value)} disabled={!!admin.warehouseId}>
+          <option value="all">All warehouses</option>
+          {warehouses.map((w) => (
+            <option key={w.id} value={w.id}>{w.short}</option>
+          ))}
+        </select>
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Customer</th>
+              <th>Items</th>
+              <th className="num">Total</th>
+              <th>Payment</th>
+              <th>Fulfilment</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((o) => (
+              <tr key={o.id} className={cx("clickable", openId === o.id && "selected")} onClick={() => setOpenId(o.id)}>
+                <td>
+                  <b className="small text-blue">{o.id}</b> {o.fromServer || o.serverSynced ? <span className="badge badge-soft-green">Server</span> : null}
+                  <div className="xs muted">{formatDateTime(o.createdAt)}</div>
+                </td>
+                <td className="small">
+                  {o.customer}
+                  <div className="xs muted">{o.address.city} · {o.address.pincode}</div>
+                </td>
+                <td className="small">{o.items.reduce((t, i) => t + i.qty, 0)}</td>
+                <td className="num small bold">{formatINR(o.pricing.total)}</td>
+                <td className="xs">
+                  <b>{o.payment.method.toUpperCase()}</b>
+                  <div className="muted" style={{ textTransform: "capitalize" }}>{o.payment.status.replace(/_/g, " ")}</div>
+                </td>
+                <td className="xs">
+                  {o.shipments.map((s) => (
+                    <div key={s.id}>
+                      {getWarehouse(s.warehouseId).short} · {SHIPMENT_LABEL[shipmentStatus(s, now)]}
+                    </div>
+                  ))}
+                  {!o.shipments.length ? <span className="muted">—</span> : null}
+                </td>
+                <td>
+                  <StatusPill status={o.live} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!list.length ? <p className="small muted center" style={{ padding: 24 }}>No orders match these filters.</p> : null}
+      </div>
+      <Drawer open={!!open} onClose={() => setOpenId(null)} width="min(100vw, 620px)">
+        <OrderDrawer order={open} onClose={() => setOpenId(null)} admin={admin} now={now} />
+      </Drawer>
+    </div>
   );
 }
