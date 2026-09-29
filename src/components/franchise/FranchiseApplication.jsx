@@ -1,635 +1,372 @@
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
-  ChevronDown,
-  MapPin,
-  Store,
-  UserRound,
-  Wallet,
-} from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, ArrowRight, Briefcase, Building2, Check, CheckCircle2, Copy, IndianRupee, MapPin, ShieldCheck, Store, User } from "lucide-react";
+import { franchiseTiers } from "../../data/franchise";
+import { lookupPincode } from "../../data/logistics";
+import { submitApplication, validateApplication } from "../../lib/services/franchise";
+import { useCurrentUser } from "../../lib/services/account";
+import { cx } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { Breadcrumbs, Field, useDocumentTitle } from "../common/ui";
 import "./FranchiseApplication.css";
 
-const INITIAL_FORM = {
-  name: "",
-  email: "",
-  phone: "",
-  city: "",
-  state: "",
-  model: "",
-  investment: "",
-  experience: "",
-  storeArea: "",
-  property: "",
-  message: "",
-};
-
-const STATES = [
-  "Maharashtra",
-  "Karnataka",
-  "Delhi",
-  "Rajasthan",
-  "Telangana",
-  "Tamil Nadu",
-  "West Bengal",
-  "Jharkhand",
-  "Uttar Pradesh",
-  "Gujarat",
-  "Other",
+const STEPS = [
+  { title: "Personal details", icon: User },
+  { title: "Proposed location", icon: MapPin },
+  { title: "Format & investment", icon: IndianRupee },
+  { title: "Experience", icon: Briefcase },
+  { title: "Review & submit", icon: ShieldCheck },
 ];
 
-const MODELS = [
-  "FOFO",
-  "FOCO",
+const CAPACITY = [
+  ["₹10 – 15 Lakh", 1200000],
+  ["₹15 – 20 Lakh", 1700000],
+  ["₹20 – 30 Lakh", 2500000],
+  ["₹30 – 50 Lakh", 4000000],
+  ["₹50 Lakh+", 6000000],
 ];
 
-const INVESTMENTS = [
-  "₹10L – ₹15L",
-  "₹15L – ₹30L",
-  "₹30L – ₹50L",
-  "₹50L+",
-];
+const DRAFT_KEY = "d2c_franchise_draft";
 
-export default function FranchiseApplication({
-  onSubmit,
-  onBack,
-}) {
-  const [form, setForm] =
-    useState(INITIAL_FORM);
+function Choice({ options, value, onChange, error }) {
+  return (
+    <>
+      <div className="choice">
+        {options.map((o) => (
+          <button key={o} type="button" className={cx("chip", value === o && "active")} onClick={() => onChange(o)}>
+            {o}
+          </button>
+        ))}
+      </div>
+      {error ? <span className="error-text xs">{error}</span> : null}
+    </>
+  );
+}
 
-  const [submitted, setSubmitted] =
-    useState(false);
+export default function FranchiseApplication() {
+  useDocumentTitle("Apply for franchise");
+  const [params] = useSearchParams();
+  const user = useCurrentUser();
+  const [step, setStep] = useState(0);
+  const [errors, setErrors] = useState({});
+  const [done, setDone] = useState(null);
+  const [a, setA] = useState(() => {
+    let draft = {};
+    try {
+      draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}");
+    } catch {
+      draft = {};
+    }
+    return {
+      name: user?.name || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      currentCity: "",
+      occupation: "",
+      city: "",
+      state: "",
+      pincode: "",
+      propertyStatus: "",
+      propertyType: "",
+      area: "",
+      frontage: "",
+      tier: params.get("tier") || "standard",
+      model: "FOFO",
+      capacity: "",
+      capacityValue: 0,
+      funding: "",
+      timeline: "",
+      experience: "",
+      business: "",
+      why: "",
+      heard: "",
+      consent: false,
+      ...draft,
+    };
+  });
 
-  const [errors, setErrors] =
-    useState({});
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...a, consent: false }));
+    } catch {
+      /* ignore */
+    }
+  }, [a]);
 
-  const updateField = (
-    field,
-    value
-  ) => {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
-
-    setErrors((current) => ({
-      ...current,
-      [field]: "",
-    }));
+  const set = (k, v) => {
+    const next = { ...a, [k]: v };
+    if (k === "pincode" && /^\d{6}$/.test(v)) {
+      const loc = lookupPincode(v);
+      if (loc) {
+        next.city = next.city || loc.city;
+        next.state = loc.state.split(" / ")[0];
+      }
+    }
+    setA(next);
+    if (errors[k]) setErrors({ ...errors, [k]: undefined });
   };
 
-  const validate = () => {
-    const nextErrors = {};
-
-    if (!form.name.trim())
-      nextErrors.name =
-        "Enter your name";
-
-    if (!form.email.trim())
-      nextErrors.email =
-        "Enter your email";
-
-    if (!form.phone.trim())
-      nextErrors.phone =
-        "Enter your phone number";
-
-    if (!form.city.trim())
-      nextErrors.city =
-        "Enter your preferred city";
-
-    if (!form.state)
-      nextErrors.state =
-        "Select a state";
-
-    if (!form.model)
-      nextErrors.model =
-        "Select a franchise model";
-
-    if (!form.investment)
-      nextErrors.investment =
-        "Select an investment range";
-
-    return nextErrors;
-  };
-
-  const submitApplication = (
-    event
-  ) => {
-    event.preventDefault();
-
-    const nextErrors =
-      validate();
-
-    if (
-      Object.keys(nextErrors).length
-    ) {
-      setErrors(nextErrors);
+  const next = () => {
+    const e = validateApplication(a, step);
+    setErrors(e);
+    if (Object.keys(e).length) {
+      toast.error("Please complete the highlighted fields");
       return;
     }
-
-    const application = {
-      ...form,
-      applicationId: `FR-${Date.now()
-        .toString()
-        .slice(-8)}`,
-      status: "New",
-      submittedAt:
-        new Date().toISOString(),
-    };
-
-    onSubmit?.(application);
-    setSubmitted(true);
+    setStep(step + 1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  if (submitted) {
+  const submit = () => {
+    const r = submitApplication(a);
+    if (!r.ok) {
+      setErrors(r.errors);
+      const firstStep = ["name", "email", "phone", "currentCity", "occupation"].some((k) => r.errors[k]) ? 0 : ["city", "pincode", "propertyStatus", "propertyType", "area"].some((k) => r.errors[k]) ? 1 : ["tier", "model", "capacity", "funding", "timeline"].some((k) => r.errors[k]) ? 2 : ["experience", "why"].some((k) => r.errors[k]) ? 3 : 4;
+      setStep(firstStep);
+      toast.error(Object.values(r.errors)[0]);
+      return;
+    }
+    localStorage.removeItem(DRAFT_KEY);
+    setDone(r.app);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const tier = franchiseTiers.find((t) => t.id === a.tier);
+
+  if (done) {
     return (
-      <main className="franchise-application-page">
-        <motion.section
-          className="franchise-success"
-          initial={{
-            opacity: 0,
-            y: 20,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-        >
-          <div className="franchise-success-icon">
-            <CheckCircle2 size={34} />
-          </div>
-
-          <span>
-            APPLICATION RECEIVED
-          </span>
-
-          <h1>
-            Your franchise journey
-            <br />
-            has started.
-          </h1>
-
-          <p>
-            Thank you for your interest in D2C Mall.
-            Our franchise team can review your
-            application and contact you with the next
-            steps.
-          </p>
-
-          <div className="franchise-success-card">
-            <span>
-              APPLICATION ID
-            </span>
-
-            <strong>
-              FR-
-              {Date.now()
-                .toString()
-                .slice(-8)}
-            </strong>
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              onBack?.()
-            }
-          >
-            Back to Franchise
-            <ArrowLeft size={15} />
-          </button>
-        </motion.section>
-      </main>
+      <div className="page">
+        <div className="container page-narrow">
+          <motion.div className="fa-done" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <CheckCircle2 size={56} />
+            <h1>Application submitted!</h1>
+            <p>Thank you, {done.name.split(" ")[0]}. Our franchise team will call you within 48 hours.</p>
+            <div className="fa-id">
+              <span className="xs">Your application ID</span>
+              <b>{done.id}</b>
+              <button className="link xs" onClick={() => { navigator.clipboard?.writeText(done.id).catch(() => {}); toast("Copied"); }}>
+                <Copy size={12} /> Copy
+              </button>
+            </div>
+            <div className="row gap-6 wrap mt-16" style={{ justifyContent: "center" }}>
+              <Link to={`/franchise/status?id=${done.id}&phone=${done.phone}`} className="btn btn-lg btn-white">
+                Track status
+              </Link>
+              <Link to="/" className="btn btn-lg btn-glass">
+                Back to shopping
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <main className="franchise-application-page">
-      <section className="franchise-application-header">
-        <button
-          type="button"
-          onClick={() =>
-            onBack?.()
-          }
-        >
-          <ArrowLeft size={15} />
-          Back to franchise
-        </button>
-
-        <div>
-          <span>
-            FRANCHISE APPLICATION
-          </span>
-
-          <h1>
-            Tell us about
-            <br />
-            <em>your plan.</em>
-          </h1>
-
-          <p>
-            Share a few details about yourself and
-            your proposed D2C Mall opportunity.
-          </p>
-        </div>
-      </section>
-
-      <form
-        className="franchise-form"
-        onSubmit={submitApplication}
-      >
-        <section className="franchise-form-section">
-          <div className="franchise-form-heading">
-            <div>
-              <UserRound size={17} />
-            </div>
-
-            <section>
-              <span>01</span>
-              <h2>Your details</h2>
-              <p>
-                How can our franchise team reach you?
-              </p>
-            </section>
-          </div>
-
-          <div className="franchise-form-grid">
-            <label>
-              <span>Full name *</span>
-              <input
-                value={form.name}
-                onChange={(event) =>
-                  updateField(
-                    "name",
-                    event.target.value
-                  )
-                }
-                placeholder="Your full name"
-              />
-              {errors.name && (
-                <small>
-                  {errors.name}
-                </small>
-              )}
-            </label>
-
-            <label>
-              <span>Email *</span>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(event) =>
-                  updateField(
-                    "email",
-                    event.target.value
-                  )
-                }
-                placeholder="you@example.com"
-              />
-              {errors.email && (
-                <small>
-                  {errors.email}
-                </small>
-              )}
-            </label>
-
-            <label>
-              <span>Phone number *</span>
-              <input
-                value={form.phone}
-                onChange={(event) =>
-                  updateField(
-                    "phone",
-                    event.target.value
-                  )
-                }
-                placeholder="+91"
-              />
-              {errors.phone && (
-                <small>
-                  {errors.phone}
-                </small>
-              )}
-            </label>
-
-            <label>
-              <span>
-                Business experience
-              </span>
-              <input
-                value={form.experience}
-                onChange={(event) =>
-                  updateField(
-                    "experience",
-                    event.target.value
-                  )
-                }
-                placeholder="Retail, fashion, other..."
-              />
-            </label>
-          </div>
-        </section>
-
-        <section className="franchise-form-section">
-          <div className="franchise-form-heading">
-            <div>
-              <MapPin size={17} />
-            </div>
-
-            <section>
-              <span>02</span>
-              <h2>Choose your market</h2>
-              <p>
-                Tell us where you want to build.
-              </p>
-            </section>
-          </div>
-
-          <div className="franchise-form-grid">
-            <label>
-              <span>Preferred city *</span>
-              <input
-                value={form.city}
-                onChange={(event) =>
-                  updateField(
-                    "city",
-                    event.target.value
-                  )
-                }
-                placeholder="Mumbai, Bengaluru..."
-              />
-              {errors.city && (
-                <small>
-                  {errors.city}
-                </small>
-              )}
-            </label>
-
-            <label>
-              <span>State *</span>
-
-              <div className="franchise-select">
-                <select
-                  value={form.state}
-                  onChange={(event) =>
-                    updateField(
-                      "state",
-                      event.target.value
-                    )
-                  }
-                >
-                  <option value="">
-                    Select state
-                  </option>
-
-                  {STATES.map(
-                    (state) => (
-                      <option
-                        key={state}
-                        value={state}
-                      >
-                        {state}
-                      </option>
-                    )
-                  )}
-                </select>
-
-                <ChevronDown
-                  size={14}
-                />
-              </div>
-
-              {errors.state && (
-                <small>
-                  {errors.state}
-                </small>
-              )}
-            </label>
-
-            <label>
-              <span>
-                Proposed store area
-              </span>
-              <input
-                value={form.storeArea}
-                onChange={(event) =>
-                  updateField(
-                    "storeArea",
-                    event.target.value
-                  )
-                }
-                placeholder="Approx. sq.ft."
-              />
-            </label>
-
-            <label>
-              <span>
-                Do you have a property?
-              </span>
-
-              <div className="franchise-select">
-                <select
-                  value={form.property}
-                  onChange={(event) =>
-                    updateField(
-                      "property",
-                      event.target.value
-                    )
-                  }
-                >
-                  <option value="">
-                    Select
-                  </option>
-                  <option value="Yes">
-                    Yes
-                  </option>
-                  <option value="No">
-                    No
-                  </option>
-                  <option value="Looking">
-                    Looking for one
-                  </option>
-                </select>
-
-                <ChevronDown
-                  size={14}
-                />
-              </div>
-            </label>
-          </div>
-        </section>
-
-        <section className="franchise-form-section">
-          <div className="franchise-form-heading">
-            <div>
-              <Store size={17} />
-            </div>
-
-            <section>
-              <span>03</span>
-              <h2>Franchise model</h2>
-              <p>
-                Choose the operating structure you are
-                interested in.
-              </p>
-            </section>
-          </div>
-
-          <div className="franchise-choice-grid">
-            {MODELS.map(
-              (model) => (
-                <button
-                  type="button"
-                  className={
-                    form.model === model
-                      ? "selected"
-                      : ""
-                  }
-                  key={model}
-                  onClick={() =>
-                    updateField(
-                      "model",
-                      model
-                    )
-                  }
-                >
-                  <strong>
-                    {model}
-                  </strong>
-
+    <div className="page">
+      <div className="container">
+        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Franchise", to: "/franchise" }, { label: "Apply" }]} />
+        <div className="fa-layout">
+          <aside className="fa-side">
+            <span className="eyebrow">
+              <Store size={13} /> Franchise application
+            </span>
+            <h1>Open your D2C Mall</h1>
+            <p className="small muted">Takes about 5 minutes. Your progress is saved automatically.</p>
+            <div className="fa-steps">
+              {STEPS.map((s, i) => (
+                <button key={s.title} className={cx("fa-step", i === step && "active", i < step && "done")} onClick={() => i < step && setStep(i)}>
+                  <span className="fa-step-icon">{i < step ? <Check size={15} /> : <s.icon size={15} />}</span>
                   <span>
-                    {model ===
-                    "FOFO"
-                      ? "Franchise Owned · Franchise Operated"
-                      : "Franchise Owned · Company Operated"}
+                    <span className="xs muted">Step {i + 1}</span>
+                    <b className="small" style={{ display: "block" }}>{s.title}</b>
                   </span>
-
-                  {form.model ===
-                    model && (
-                    <CheckCircle2
-                      size={17}
-                    />
-                  )}
                 </button>
-              )
-            )}
-          </div>
-
-          {errors.model && (
-            <small className="form-wide-error">
-              {errors.model}
-            </small>
-          )}
-        </section>
-
-        <section className="franchise-form-section">
-          <div className="franchise-form-heading">
-            <div>
-              <Wallet size={17} />
+              ))}
             </div>
+            {tier ? (
+              <div className="fa-tier" style={{ "--tc": tier.color }}>
+                <span className="xs">Selected format</span>
+                <b>{tier.name}</b>
+                <span className="small">{tier.investmentLabel} · {a.model}</span>
+              </div>
+            ) : null}
+          </aside>
 
-            <section>
-              <span>04</span>
-              <h2>Investment plan</h2>
-              <p>
-                Select the investment range you are
-                considering.
-              </p>
-            </section>
-          </div>
+          <section className="fa-main card card-pad-lg">
+            <div className="progress mb-16">
+              <span style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
+            </div>
+            <h2 className="fa-title">{STEPS[step].title}</h2>
 
-          <div className="franchise-investment-grid">
-            {INVESTMENTS.map(
-              (investment) => (
-                <button
-                  type="button"
-                  className={
-                    form.investment ===
-                    investment
-                      ? "selected"
-                      : ""
-                  }
-                  key={investment}
-                  onClick={() =>
-                    updateField(
-                      "investment",
-                      investment
-                    )
-                  }
-                >
-                  {investment}
+            {step === 0 ? (
+              <div className="form-grid mt-16">
+                <Field label="Full name *" error={errors.name}>
+                  <input className="input" value={a.name} onChange={(e) => set("name", e.target.value)} />
+                </Field>
+                <Field label="Email *" error={errors.email}>
+                  <input className="input" type="email" value={a.email} onChange={(e) => set("email", e.target.value)} />
+                </Field>
+                <Field label="Mobile number *" error={errors.phone}>
+                  <div className="input-group">
+                    <span className="addon">+91</span>
+                    <input className="input" maxLength={10} value={a.phone} onChange={(e) => set("phone", e.target.value.replace(/\D/g, ""))} />
+                  </div>
+                </Field>
+                <Field label="Current city *" error={errors.currentCity}>
+                  <input className="input" value={a.currentCity} onChange={(e) => set("currentCity", e.target.value)} />
+                </Field>
+                <div className="field span-2">
+                  <label>Current occupation *</label>
+                  <Choice options={["Business owner", "Salaried professional", "Retailer / distributor", "Investor", "Other"]} value={a.occupation} onChange={(v) => set("occupation", v)} error={errors.occupation} />
+                </div>
+              </div>
+            ) : null}
 
-                  {form.investment ===
-                    investment && (
-                    <CheckCircle2
-                      size={15}
-                    />
-                  )}
+            {step === 1 ? (
+              <div className="form-grid mt-16">
+                <Field label="Proposed store pincode *" error={errors.pincode} hint={lookupPincode(a.pincode) ? `📍 ${lookupPincode(a.pincode).city}, ${lookupPincode(a.pincode).state}` : null}>
+                  <input className="input" maxLength={6} value={a.pincode} onChange={(e) => set("pincode", e.target.value.replace(/\D/g, ""))} />
+                </Field>
+                <Field label="City *" error={errors.city}>
+                  <input className="input" value={a.city} onChange={(e) => set("city", e.target.value)} />
+                </Field>
+                <Field label="State">
+                  <input className="input" value={a.state} onChange={(e) => set("state", e.target.value)} />
+                </Field>
+                <Field label="Carpet area (sq ft) *" error={errors.area} hint={tier ? `${tier.name} needs ${tier.areaSqft}` : null}>
+                  <input className="input" inputMode="numeric" value={a.area} onChange={(e) => set("area", e.target.value.replace(/\D/g, ""))} />
+                </Field>
+                <div className="field span-2">
+                  <label>Property status *</label>
+                  <Choice options={["Owned", "Leased", "Looking for property"]} value={a.propertyStatus} onChange={(v) => set("propertyStatus", v)} error={errors.propertyStatus} />
+                </div>
+                <div className="field span-2">
+                  <label>Property type *</label>
+                  <Choice options={["High street", "Mall", "Market complex", "Other"]} value={a.propertyType} onChange={(v) => set("propertyType", v)} error={errors.propertyType} />
+                </div>
+                <Field label="Frontage (ft, optional)">
+                  <input className="input" inputMode="numeric" value={a.frontage} onChange={(e) => set("frontage", e.target.value.replace(/\D/g, ""))} />
+                </Field>
+              </div>
+            ) : null}
+
+            {step === 2 ? (
+              <div className="col gap-16 mt-16">
+                <div className="grid grid-3">
+                  {franchiseTiers.map((t) => (
+                    <button key={t.id} type="button" className={cx("fa-tier-opt", a.tier === t.id && "active")} style={{ "--tc": t.color }} onClick={() => set("tier", t.id)}>
+                      <span className="xs bold" style={{ color: t.color }}>{t.name}</span>
+                      <b>{t.investmentLabel}</b>
+                      <span className="xs muted">{t.areaSqft}</span>
+                    </button>
+                  ))}
+                </div>
+                {errors.tier ? <span className="error-text xs">{errors.tier}</span> : null}
+                <div className="field">
+                  <label>Business model *</label>
+                  <div className="grid grid-2">
+                    {[["FOFO", "Franchise Owned, Franchise Operated", "You run the store"], ["FOCO", "Franchise Owned, Company Operated", "We run it, you earn a share"]].map(([m, t, s]) => (
+                      <label key={m} className={cx("radio-card", a.model === m && "active")}>
+                        <input type="radio" checked={a.model === m} onChange={() => set("model", m)} />
+                        <div>
+                          <b className="small">{m}</b> <span className="xs muted">· {t}</span>
+                          <p className="xs muted">{s}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Investment capacity *</label>
+                  <Choice options={CAPACITY.map((c) => c[0])} value={a.capacity} onChange={(v) => setA({ ...a, capacity: v, capacityValue: CAPACITY.find((c) => c[0] === v)[1] })} error={errors.capacity} />
+                  {tier && a.capacityValue && a.capacityValue < tier.investment ? <span className="xs text-orange bold">Your capacity is below the {tier.investmentLabel} requirement — consider a smaller format or financing.</span> : null}
+                </div>
+                <div className="field">
+                  <label>Source of funds *</label>
+                  <Choice options={["Self-funded", "Bank loan", "Partnership", "Mix"]} value={a.funding} onChange={(v) => set("funding", v)} error={errors.funding} />
+                </div>
+                <div className="field">
+                  <label>When do you plan to launch? *</label>
+                  <Choice options={["Within 3 months", "3 – 6 months", "6 – 12 months"]} value={a.timeline} onChange={(v) => set("timeline", v)} error={errors.timeline} />
+                </div>
+              </div>
+            ) : null}
+
+            {step === 3 ? (
+              <div className="col gap-16 mt-16">
+                <div className="field">
+                  <label>Retail / business experience *</label>
+                  <Choice options={["No experience", "1-3 years", "3-5 years", "5+ years"]} value={a.experience} onChange={(v) => set("experience", v)} error={errors.experience} />
+                </div>
+                <Field label="Current business (if any)">
+                  <input className="input" value={a.business} onChange={(e) => set("business", e.target.value)} placeholder="e.g. Apparel store, 8 years" />
+                </Field>
+                <Field label="Why D2C Mall? *" error={errors.why} hint={`${a.why.length}/600`}>
+                  <textarea className="textarea" maxLength={600} value={a.why} onChange={(e) => set("why", e.target.value)} placeholder="Tell us about your city, customers and why you'd be a great partner" />
+                </Field>
+                <div className="field">
+                  <label>How did you hear about us?</label>
+                  <Choice options={["Instagram", "D2C Mall website", "Friend / referral", "News / event", "Other"]} value={a.heard} onChange={(v) => set("heard", v)} />
+                </div>
+              </div>
+            ) : null}
+
+            {step === 4 ? (
+              <div className="col gap-16 mt-16">
+                {[
+                  ["Personal", [["Name", a.name], ["Email", a.email], ["Mobile", `+91 ${a.phone}`], ["Current city", a.currentCity], ["Occupation", a.occupation]], 0],
+                  ["Location", [["Store location", `${a.city}, ${a.state} – ${a.pincode}`], ["Property", `${a.propertyStatus} · ${a.propertyType}`], ["Area", `${a.area} sq ft${a.frontage ? ` · ${a.frontage} ft frontage` : ""}`]], 1],
+                  ["Investment", [["Format", `${tier?.name} (${tier?.investmentLabel})`], ["Model", a.model], ["Capacity", a.capacity], ["Funding", a.funding], ["Timeline", a.timeline]], 2],
+                  ["Experience", [["Experience", a.experience], ["Business", a.business || "—"], ["Why", a.why]], 3],
+                ].map(([title, rows, s]) => (
+                  <div key={title} className="soft-panel">
+                    <div className="row between">
+                      <b className="small">{title}</b>
+                      <button className="link xs" onClick={() => setStep(s)}>Edit</button>
+                    </div>
+                    <div className="fa-review">
+                      {rows.map(([k, v]) => (
+                        <div key={k}>
+                          <span className="xs muted">{k}</span>
+                          <span className="small">{v || "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <label className="check">
+                  <input type="checkbox" checked={a.consent} onChange={(e) => set("consent", e.target.checked)} />
+                  <span className="small">I confirm the details are accurate and agree to be contacted by D2C Mall's franchise team by phone, email and WhatsApp.</span>
+                </label>
+                {errors.consent ? <span className="error-text xs">{errors.consent}</span> : null}
+              </div>
+            ) : null}
+
+            <div className="fa-nav">
+              {step > 0 ? (
+                <button className="btn btn-outline" onClick={() => setStep(step - 1)}>
+                  <ArrowLeft size={16} /> Back
                 </button>
-              )
-            )}
-          </div>
-
-          {errors.investment && (
-            <small className="form-wide-error">
-              {errors.investment}
-            </small>
-          )}
-        </section>
-
-        <section className="franchise-form-section">
-          <div className="franchise-form-heading">
-            <div>
-              <Store size={17} />
+              ) : (
+                <Link to="/franchise" className="btn btn-outline">
+                  <Building2 size={16} /> Programme details
+                </Link>
+              )}
+              {step < STEPS.length - 1 ? (
+                <button className="btn" onClick={next}>
+                  Continue <ArrowRight size={16} />
+                </button>
+              ) : (
+                <button className="btn btn-green" onClick={submit}>
+                  <CheckCircle2 size={16} /> Submit application
+                </button>
+              )}
             </div>
-
-            <section>
-              <span>05</span>
-              <h2>Anything else?</h2>
-              <p>
-                Give the franchise team additional
-                context.
-              </p>
-            </section>
-          </div>
-
-          <label className="franchise-message-field">
-            <span>
-              Tell us about your plan
-            </span>
-
-            <textarea
-              value={form.message}
-              onChange={(event) =>
-                updateField(
-                  "message",
-                  event.target.value
-                )
-              }
-              placeholder="Tell us about your retail experience, location, business plans or anything else you want us to know..."
-              rows="6"
-            />
-          </label>
-        </section>
-
-        <div className="franchise-form-submit">
-          <div>
-            <ShieldCheck size={16} />
-
-            <span>
-              Your information is used only for
-              franchise evaluation and communication.
-            </span>
-          </div>
-
-          <button type="submit">
-            Submit Application
-            <ArrowRight size={16} />
-          </button>
+          </section>
         </div>
-      </form>
-    </main>
+      </div>
+    </div>
   );
 }

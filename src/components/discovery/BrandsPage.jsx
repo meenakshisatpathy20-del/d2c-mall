@@ -1,307 +1,149 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Heart, Search, ShoppingBag, Star } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useShop } from "../../context/ShopContext";
-import { brands, products } from "../../data/catalog";
+import { Link, useParams } from "react-router-dom";
+import { BadgeCheck, MapPin, Search, Star, Store, Users } from "lucide-react";
+import { brands, categories, getBrand, getProductsByBrand } from "../../data/catalog";
+import { compact, cx } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { Breadcrumbs, Empty, Img, useDocumentTitle } from "../common/ui";
+import ListingView from "../shop/ListingView";
 import "./BrandsPage.css";
 
-const formatPrice = (value) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
-
-const brandColors = [
-  "orange",
-  "blue",
-  "green",
-  "navy",
-  "pink",
-  "gold",
-];
-
-function BrandProductCard({ product, onOpen, onAdd }) {
-  const { wishlist, toggleWishlist } = useShop();
-  const isWishlisted = wishlist.some((item) => item.id === product.id);
-
+function BrandStore({ brand }) {
+  const items = getProductsByBrand(brand.id);
+  const rating = items.reduce((t, p) => t + p.rating, 0) / (items.length || 1);
+  const [following, setFollowing] = useState(false);
+  const followers = 12000 + brand.name.length * 3100;
   return (
-    <article className="brand-product-card">
-      <button
-        className={`brand-product-wishlist ${isWishlisted ? "active" : ""}`}
-        onClick={() => toggleWishlist(product)}
-        aria-label="Toggle wishlist"
-      >
-        <Heart size={16} fill={isWishlisted ? "currentColor" : "none"} />
-      </button>
-
-      <button
-        className="brand-product-image"
-        onClick={() => onOpen(product.id)}
-      >
-        <img src={product.image} alt={product.name} />
-      </button>
-
-      <div className="brand-product-content">
-        <span>{product.brand}</span>
-
-        <button
-          className="brand-product-name"
-          onClick={() => onOpen(product.id)}
-        >
-          {product.name}
-        </button>
-
-        <div className="brand-product-meta">
-          <span>
-            <Star size={11} fill="currentColor" />
-            {product.rating}
-          </span>
-          <small>{product.reviewCount || 0} reviews</small>
-        </div>
-
-        <div className="brand-product-price">
-          <strong>{formatPrice(product.price)}</strong>
-          <del>{formatPrice(product.mrp)}</del>
-        </div>
-
-        <button
-          className="brand-add-button"
-          onClick={() => onAdd(product)}
-          disabled={product.stock <= 0}
-        >
-          <ShoppingBag size={14} />
-          {product.stock <= 0 ? "Out of Stock" : "Add to Cart"}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function BrandsPage() {
-  const navigate = useNavigate();
-  const { addToCart } = useShop();
-
-  const [search, setSearch] = useState("");
-  const [selectedBrand, setSelectedBrand] = useState(brands[0] || null);
-
-  const filteredBrands = useMemo(() => {
-    if (!search.trim()) return brands;
-
-    return brands.filter((brand) =>
-      brand.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search]);
-
-  const selectedProducts = useMemo(() => {
-    if (!selectedBrand) return [];
-
-    return products.filter(
-      (product) =>
-        product.brand?.toLowerCase() === selectedBrand.name.toLowerCase()
-    );
-  }, [selectedBrand]);
-
-  const popularProducts = useMemo(() => {
-    return products
-      .filter((product) => product.brand)
-      .sort((a, b) => {
-        const ratingA = Number(a.rating || 0);
-        const ratingB = Number(b.rating || 0);
-        return ratingB - ratingA;
-      })
-      .slice(0, 4);
-  }, []);
-
-  return (
-    <main className="brands-page">
-      <section className="brands-hero">
-        <div className="brands-hero-copy">
-          <span>THE D2C BRAND EDIT</span>
-          <h1>
-            Discover
-            <br />
-            <strong>your brands.</strong>
-          </h1>
-          <p>
-            Explore the labels behind the products people are discovering,
-            wearing, gifting and bringing home.
-          </p>
-
-          <div className="brands-search">
-            <Search size={17} />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search brands..."
-            />
-          </div>
-        </div>
-
-        <div className="brands-hero-grid">
-          <div className="brand-hero-tile tile-orange">
-            <small>01</small>
-            <strong>FASHION</strong>
-            <span>Everyday edits</span>
-          </div>
-
-          <div className="brand-hero-tile tile-blue">
-            <small>02</small>
-            <strong>BEAUTY</strong>
-            <span>Glow favourites</span>
-          </div>
-
-          <div className="brand-hero-tile tile-green">
-            <small>03</small>
-            <strong>LIFESTYLE</strong>
-            <span>Made for living</span>
-          </div>
-
-          <div className="brand-hero-tile tile-navy">
-            <small>04</small>
-            <strong>MORE</strong>
-            <span>Keep exploring</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="brands-main">
-        <div className="brands-heading">
-          <div>
-            <span>SHOP BY BRAND</span>
-            <h2>Brands you can discover</h2>
-          </div>
-
-          <span className="brands-count">
-            {filteredBrands.length} brands
-          </span>
-        </div>
-
-        {filteredBrands.length > 0 ? (
-          <div className="brands-grid">
-            {filteredBrands.map((brand, index) => {
-              const brandProducts = products.filter(
-                (product) =>
-                  product.brand?.toLowerCase() === brand.name.toLowerCase()
-              );
-
-              const color = brandColors[index % brandColors.length];
-
-              return (
-                <button
-                  key={brand.name}
-                  className={`brand-card ${color} ${
-                    selectedBrand?.name === brand.name ? "selected" : ""
-                  }`}
-                  onClick={() => setSelectedBrand(brand)}
-                >
-                  <span className="brand-card-mark">
-                    {brand.name.charAt(0)}
-                  </span>
-
-                  <span className="brand-card-content">
-                    <strong>{brand.name}</strong>
-                    <small>
-                      {brandProducts.length}{" "}
-                      {brandProducts.length === 1 ? "product" : "products"}
-                    </small>
-                  </span>
-
-                  <ArrowRight size={17} />
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="brands-empty">
-            <Search size={28} />
-            <h3>No brands found</h3>
-            <p>Try searching with another brand name.</p>
-            <button onClick={() => setSearch("")}>View all brands</button>
-          </div>
-        )}
-      </section>
-
-      {selectedBrand && selectedProducts.length > 0 && (
-        <section className="selected-brand-section">
-          <div className="selected-brand-header">
-            <div>
-              <span>BRAND SPOTLIGHT</span>
-              <h2>{selectedBrand.name}</h2>
-              <p>
-                Explore products currently available from{" "}
-                {selectedBrand.name}.
-              </p>
+    <>
+      <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Brands", to: "/brands" }, { label: brand.name }]} />
+      <ListingView
+        products={items}
+        defaultSort="popularity"
+        header={
+          <div className="brand-hero" style={{ "--brand": brand.color }}>
+            <div className="brand-hero-cover">
+              {items.slice(0, 4).map((p) => (
+                <Img key={p.id} src={p.images[0]} alt="" label={brand.name} />
+              ))}
             </div>
-
-            <button
-              onClick={() =>
-                navigate(`/search?q=${encodeURIComponent(selectedBrand.name)}`)
-              }
-            >
-              View all
-              <ArrowRight size={15} />
-            </button>
+            <div className="brand-hero-body">
+              <span className="brand-hero-logo">{brand.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}</span>
+              <div className="grow">
+                <h1 className="row gap-6">
+                  {brand.name} <BadgeCheck size={22} className="text-blue" />
+                </h1>
+                <p className="muted">{brand.tagline}</p>
+                <div className="row wrap gap-16 mt-8 small muted">
+                  <span className="row gap-4">
+                    <Star size={14} fill="#f5a524" color="#f5a524" /> {rating.toFixed(1)} avg rating
+                  </span>
+                  <span className="row gap-4">
+                    <MapPin size={14} /> {brand.city}
+                  </span>
+                  <span className="row gap-4">
+                    <Users size={14} /> {compact(followers + (following ? 1 : 0))} followers
+                  </span>
+                  <span>Since {brand.founded}</span>
+                </div>
+              </div>
+              <button
+                className={cx("btn", following ? "btn-outline" : "btn-blue")}
+                onClick={() => {
+                  setFollowing(!following);
+                  toast(following ? `Unfollowed ${brand.name}` : `Following ${brand.name} — you'll hear about new drops first`);
+                }}
+              >
+                {following ? "Following" : "+ Follow brand"}
+              </button>
+            </div>
           </div>
-
-          <div className="brand-products-grid">
-            {selectedProducts.slice(0, 4).map((product) => (
-              <BrandProductCard
-                key={product.id}
-                product={product}
-                onOpen={(id) => navigate(`/product/${id}`)}
-                onAdd={addToCart}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="popular-brand-products">
-        <div className="brands-heading">
-          <div>
-            <span>POPULAR ACROSS D2C</span>
-            <h2>Products shoppers love</h2>
-          </div>
-
-          <button
-            className="brands-view-all"
-            onClick={() => navigate("/shop")}
-          >
-            Shop everything
-            <ArrowRight size={15} />
-          </button>
-        </div>
-
-        <div className="brand-products-grid">
-          {popularProducts.map((product) => (
-            <BrandProductCard
-              key={product.id}
-              product={product}
-              onOpen={(id) => navigate(`/product/${id}`)}
-              onAdd={addToCart}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="brands-bottom-banner">
-        <div>
-          <span>FIND YOUR NEXT FAVOURITE</span>
-          <h2>One mall. Hundreds of possibilities.</h2>
-          <p>
-            Discover fashion, beauty, electronics, home, jewellery and more
-            from one D2C marketplace.
-          </p>
-        </div>
-
-        <button onClick={() => navigate("/shop")}>
-          Start shopping
-          <ArrowRight size={16} />
-        </button>
-      </section>
-    </main>
+        }
+      />
+    </>
   );
 }
 
-export default BrandsPage;
+export default function BrandsPage() {
+  const { brandId } = useParams();
+  const brand = brandId ? getBrand(brandId) : null;
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("all");
+  useDocumentTitle(brand ? brand.name : "All brands");
+
+  const list = useMemo(
+    () => brands.filter((b) => (cat === "all" || b.category === cat) && b.name.toLowerCase().includes(q.toLowerCase())),
+    [q, cat]
+  );
+
+  if (brandId && !brand) {
+    return (
+      <div className="page container">
+        <Empty icon={<Store size={34} />} title="Brand not found" action={<Link to="/brands" className="btn">All brands</Link>} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="page">
+      <div className="container">
+        {brand ? (
+          <BrandStore brand={brand} />
+        ) : (
+          <>
+            <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Brands" }]} />
+            <div className="page-hero">
+              <span className="eyebrow light">
+                <Store size={13} /> Brand directory
+              </span>
+              <h1>Meet the makers.</h1>
+              <p>Every brand on D2C Mall is verified, founder-led and ships directly through our fulfilment network.</p>
+              <div className="brand-search">
+                <Search size={17} />
+                <input placeholder="Search brands" value={q} onChange={(e) => setQ(e.target.value)} />
+              </div>
+            </div>
+            <div className="chips mt-24">
+              <button className={cx("chip", cat === "all" && "active")} onClick={() => setCat("all")}>
+                All
+              </button>
+              {categories.map((c) => (
+                <button key={c.id} className={cx("chip", cat === c.id && "active")} onClick={() => setCat(c.id)}>
+                  {c.name}
+                </button>
+              ))}
+            </div>
+            <div className="brand-dir mt-16">
+              {list.map((b) => {
+                const items = getProductsByBrand(b.id);
+                return (
+                  <Link key={b.id} to={`/brands/${b.id}`} className="brand-dir-card" style={{ "--brand": b.color }}>
+                    <div className="brand-dir-cover">
+                      {items.slice(0, 3).map((p) => (
+                        <Img key={p.id} src={p.images[0]} alt="" label={b.name} />
+                      ))}
+                    </div>
+                    <div className="brand-dir-body">
+                      <span className="brand-hero-logo sm">{b.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <b className="row gap-4">
+                          {b.name} <BadgeCheck size={14} className="text-blue" />
+                        </b>
+                        <span className="xs muted ellipsis" style={{ display: "block" }}>
+                          {b.tagline}
+                        </span>
+                        <span className="xs faint">
+                          {items.length} products · {b.city}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            {!list.length ? <Empty title="No brands found" text="Try a different search." /> : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

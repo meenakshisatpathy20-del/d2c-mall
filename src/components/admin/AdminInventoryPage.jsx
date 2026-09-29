@@ -1,1566 +1,332 @@
-import { motion } from "framer-motion";
-import {
-  ArrowDownUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Edit3,
-  History,
-  MapPin,
-  Package,
-  Plus,
-  Search,
-  SlidersHorizontal,
-  Warehouse,
-  X,
-} from "lucide-react";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { AlertTriangle, ArrowRightLeft, Boxes, Download, History, Lock, Minus, Plus, Search, SlidersHorizontal, Unlock } from "lucide-react";
+import { useStore } from "../../lib/store";
+import { categories, productMap, products } from "../../data/catalog";
+import { getWarehouse, warehouses } from "../../data/logistics";
+import { adjustStock, releaseReservation, setThreshold, transferStock } from "../../lib/services/inventory";
+import { cx, formatDateTime, formatNumber, timeAgo } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { Img, Modal } from "../common/ui";
+import { AdminHeader, Kpi, exportCsv } from "./AdminBits";
 import "./AdminInventoryPage.css";
 
-const INITIAL_INVENTORY = [
-  {
-    sku: "D2C-SHIRT-001",
-    product: "Relaxed Fit Cotton Shirt",
-    brand: "D2C Studio",
-    category: "Women",
-    total: 48,
-    reserved: 7,
-    available: 41,
-    reorderLevel: 10,
-    warehouses: {
-      Bhiwandi: 18,
-      "Delhi NCR": 12,
-      Jaipur: 8,
-      Bengaluru: 10,
-    },
-    updated: "23 Sep 2026, 08:31 PM",
-  },
-  {
-    sku: "D2C-TSHIRT-001",
-    product: "Premium Oversized T-Shirt",
-    brand: "Urban D2C",
-    category: "Men",
-    total: 67,
-    reserved: 11,
-    available: 56,
-    reorderLevel: 15,
-    warehouses: {
-      Bhiwandi: 20,
-      "Delhi NCR": 19,
-      Jaipur: 12,
-      Bengaluru: 16,
-    },
-    updated: "23 Sep 2026, 08:19 PM",
-  },
-  {
-    sku: "D2C-SERUM-001",
-    product: "Hydrating Glow Face Serum",
-    brand: "GlowLab",
-    category: "Beauty",
-    total: 91,
-    reserved: 16,
-    available: 75,
-    reorderLevel: 20,
-    warehouses: {
-      Bhiwandi: 24,
-      "Delhi NCR": 27,
-      Jaipur: 14,
-      Bengaluru: 26,
-    },
-    updated: "23 Sep 2026, 07:52 PM",
-  },
-  {
-    sku: "D2C-SNEAK-001",
-    product: "Everyday Street Sneakers",
-    brand: "StreetForm",
-    category: "Footwear",
-    total: 29,
-    reserved: 8,
-    available: 21,
-    reorderLevel: 12,
-    warehouses: {
-      Bhiwandi: 4,
-      "Delhi NCR": 11,
-      Jaipur: 3,
-      Bengaluru: 11,
-    },
-    updated: "23 Sep 2026, 07:41 PM",
-  },
-  {
-    sku: "D2C-NECK-001",
-    product: "Minimal Gold-Tone Necklace",
-    brand: "Lustre",
-    category: "Jewellery",
-    total: 56,
-    reserved: 5,
-    available: 51,
-    reorderLevel: 10,
-    warehouses: {
-      Bhiwandi: 17,
-      "Delhi NCR": 13,
-      Jaipur: 15,
-      Bengaluru: 11,
-    },
-    updated: "23 Sep 2026, 06:48 PM",
-  },
-  {
-    sku: "D2C-LAMP-001",
-    product: "Modern Accent Table Lamp",
-    brand: "CasaForm",
-    category: "Home",
-    total: 18,
-    reserved: 6,
-    available: 12,
-    reorderLevel: 10,
-    warehouses: {
-      Bhiwandi: 3,
-      "Delhi NCR": 7,
-      Jaipur: 2,
-      Bengaluru: 6,
-    },
-    updated: "23 Sep 2026, 06:21 PM",
-  },
-  {
-    sku: "D2C-HEAD-001",
-    product: "Wireless Noise-Cancelling Headphones",
-    brand: "SoundCore D2C",
-    category: "Electronics",
-    total: 42,
-    reserved: 9,
-    available: 33,
-    reorderLevel: 12,
-    warehouses: {
-      Bhiwandi: 12,
-      "Delhi NCR": 9,
-      Jaipur: 8,
-      Bengaluru: 13,
-    },
-    updated: "23 Sep 2026, 05:57 PM",
-  },
-  {
-    sku: "D2C-DRESS-001",
-    product: "Flowy Printed Midi Dress",
-    brand: "D2C Edit",
-    category: "Women",
-    total: 31,
-    reserved: 4,
-    available: 27,
-    reorderLevel: 10,
-    warehouses: {
-      Bhiwandi: 11,
-      "Delhi NCR": 7,
-      Jaipur: 4,
-      Bengaluru: 9,
-    },
-    updated: "23 Sep 2026, 05:34 PM",
-  },
-];
+const MOVE_LABEL = {
+  reserve: ["Reserved", "badge-soft-amber"],
+  release: ["Released", "badge-soft-gray"],
+  expired: ["Reservation expired", "badge-soft-gray"],
+  sale: ["Sold", "badge-soft-blue"],
+  cancel: ["Cancelled → restock", "badge-soft-green"],
+  return: ["Return → restock", "badge-soft-green"],
+  restock: ["Restock", "badge-soft-green"],
+  adjust: ["Adjustment", "badge-soft-red"],
+  "transfer-in": ["Transfer in", "badge-soft-purple"],
+  "transfer-out": ["Transfer out", "badge-soft-purple"],
+};
 
-const WAREHOUSES = [
-  {
-    name: "Bhiwandi",
-    city: "Mumbai",
-    code: "BHI-01",
-  },
-  {
-    name: "Delhi NCR",
-    city: "Delhi",
-    code: "DEL-01",
-  },
-  {
-    name: "Jaipur",
-    city: "Jaipur",
-    code: "JAI-01",
-  },
-  {
-    name: "Bengaluru",
-    city: "Bengaluru",
-    code: "BLR-01",
-  },
-];
+export default function AdminInventoryPage({ admin }) {
+  const inventory = useStore((s) => s.inventory);
+  const movements = useStore((s) => s.stockMovements);
+  const reservations = useStore((s) => s.reservations);
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState("stock");
+  const [q, setQ] = useState("");
+  const [wh, setWh] = useState(admin.warehouseId || "all");
+  const [cat, setCat] = useState("all");
+  const [lowOnly, setLowOnly] = useState(params.get("filter") === "low");
+  const [adjust, setAdjust] = useState(null);
+  const [transfer, setTransfer] = useState(null);
+  const canEdit = ["super_admin", "warehouse_admin"].includes(admin.role);
 
-const FILTER_OPTIONS = [
-  "All",
-  "Women",
-  "Men",
-  "Beauty",
-  "Footwear",
-  "Jewellery",
-  "Home",
-  "Electronics",
-];
-
-const STOCK_OPTIONS = [
-  "All",
-  "In stock",
-  "Low stock",
-  "Out of stock",
-];
-
-function StockBadge({ available, reorderLevel }) {
-  if (available === 0) {
-    return (
-      <span className="inventory-stock-badge out">
-        <i />
-        Out of stock
-      </span>
-    );
-  }
-
-  if (available <= reorderLevel) {
-    return (
-      <span className="inventory-stock-badge low">
-        <i />
-        Low stock
-      </span>
-    );
-  }
-
-  return (
-    <span className="inventory-stock-badge healthy">
-      <i />
-      Healthy
-    </span>
-  );
-}
-
-function WarehouseBar({ warehouse, quantity, total }) {
-  const percentage =
-    total > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (quantity / total) * 100
-          )
-        )
-      : 0;
-
-  return (
-    <div className="warehouse-stock-row">
-      <div>
-        <span>
-          {warehouse}
-        </span>
-        <strong>
-          {quantity}
-        </strong>
-      </div>
-
-      <div className="warehouse-stock-track">
-        <span
-          style={{
-            width: `${percentage}%`,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function InventoryDrawer({
-  item,
-  onClose,
-  onSave,
-}) {
-  const [quantities, setQuantities] =
-    useState(item.warehouses);
-
-  const [adjustmentType, setAdjustmentType] =
-    useState("Add stock");
-
-  const [adjustmentQuantity, setAdjustmentQuantity] =
-    useState("");
-
-  const updateWarehouse = (
-    warehouse,
-    value
-  ) => {
-    setQuantities((current) => ({
-      ...current,
-      [warehouse]:
-        Math.max(
-          0,
-          Number(value) || 0
-        ),
-    }));
-  };
-
-  const saveInventory = () => {
-    const nextTotal =
-      Object.values(quantities).reduce(
-        (sum, value) =>
-          sum + Number(value),
-        0
-      );
-
-    const nextAvailable =
-      Math.max(
-        0,
-        nextTotal - item.reserved
-      );
-
-    onSave?.({
-      ...item,
-      total: nextTotal,
-      available: nextAvailable,
-      warehouses: quantities,
-      updated:
-        "Just now",
+  const rows = useMemo(() => {
+    const out = [];
+    products.forEach((p) => {
+      if (cat !== "all" && p.category !== cat) return;
+      if (q && !`${p.name} ${p.sku} ${p.brand}`.toLowerCase().includes(q.toLowerCase())) return;
+      warehouses.forEach((w) => {
+        if (wh !== "all" && w.id !== wh) return;
+        const r = inventory[p.id]?.[w.id];
+        if (!r) return;
+        const sellable = r.available - r.reserved;
+        const low = sellable <= r.threshold;
+        if (lowOnly && !low) return;
+        out.push({ p, w, ...r, sellable, low, out: sellable <= 0 });
+      });
     });
+    return out;
+  }, [inventory, q, wh, cat, lowOnly]);
 
-    onClose();
-  };
-
-  const applyAdjustment = () => {
-    const amount =
-      Number(adjustmentQuantity);
-
-    if (!amount) {
-      return;
-    }
-
-    const nextQuantities = {
-      ...quantities,
-    };
-
-    const target =
-      WAREHOUSES[0].name;
-
-    const current =
-      nextQuantities[target] || 0;
-
-    nextQuantities[target] =
-      adjustmentType ===
-      "Add stock"
-        ? current + amount
-        : Math.max(
-            0,
-            current - amount
-          );
-
-    setQuantities(
-      nextQuantities
-    );
-
-    setAdjustmentQuantity("");
-  };
+  const totals = rows.reduce((t, r) => ({ available: t.available + r.available, reserved: t.reserved + r.reserved, sold: t.sold + r.sold, low: t.low + (r.low ? 1 : 0), out: t.out + (r.out ? 1 : 0) }), { available: 0, reserved: 0, sold: 0, low: 0, out: 0 });
+  const activeRes = reservations.filter((r) => r.status === "active" && (!admin.warehouseId || r.items.some((i) => i.warehouseId === admin.warehouseId)));
+  const moves = movements.filter((m) => !admin.warehouseId || m.warehouseId === admin.warehouseId);
 
   return (
-    <motion.aside
-      className="inventory-drawer"
-      initial={{
-        x: "100%",
-      }}
-      animate={{
-        x: 0,
-      }}
-      exit={{
-        x: "100%",
-      }}
-    >
-      <div className="inventory-drawer-header">
-        <div>
-          <span>INVENTORY ITEM</span>
-          <h2>{item.product}</h2>
-          <small>{item.sku}</small>
-        </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      <div className="inventory-drawer-body">
-        <section className="inventory-item-summary">
-          <div>
-            <span>Total stock</span>
-            <strong>
-              {item.total}
-            </strong>
-          </div>
-
-          <div>
-            <span>Reserved</span>
-            <strong>
-              {item.reserved}
-            </strong>
-          </div>
-
-          <div>
-            <span>Available</span>
-            <strong>
-              {item.available}
-            </strong>
-          </div>
-        </section>
-
-        <section className="inventory-drawer-section">
-          <header>
-            <Warehouse size={15} />
-            <span>Warehouse distribution</span>
-          </header>
-
-          <div className="warehouse-edit-list">
-            {WAREHOUSES.map(
-              (warehouse) => (
-                <label
-                  key={warehouse.name}
-                >
-                  <div>
-                    <strong>
-                      {warehouse.name}
-                    </strong>
-                    <span>
-                      {warehouse.city} ·{" "}
-                      {warehouse.code}
-                    </span>
-                  </div>
-
-                  <input
-                    type="number"
-                    min="0"
-                    value={
-                      quantities[
-                        warehouse.name
-                      ] || 0
-                    }
-                    onChange={(event) =>
-                      updateWarehouse(
-                        warehouse.name,
-                        event.target.value
-                      )
-                    }
-                  />
-                </label>
-              )
-            )}
-          </div>
-        </section>
-
-        <section className="inventory-drawer-section">
-          <header>
-            <Plus size={15} />
-            <span>Quick stock adjustment</span>
-          </header>
-
-          <div className="stock-adjustment">
-            <select
-              value={
-                adjustmentType
-              }
-              onChange={(event) =>
-                setAdjustmentType(
-                  event.target.value
-                )
-              }
-            >
-              <option>
-                Add stock
-              </option>
-              <option>
-                Remove stock
-              </option>
-            </select>
-
-            <input
-              type="number"
-              min="1"
-              placeholder="Quantity"
-              value={
-                adjustmentQuantity
-              }
-              onChange={(event) =>
-                setAdjustmentQuantity(
-                  event.target.value
-                )
-              }
-            />
-
-            <button
-              type="button"
-              onClick={
-                applyAdjustment
-              }
-            >
-              Apply
-            </button>
-          </div>
-
-          <small>
-            Adjustments will later create an
-            immutable inventory movement record.
-          </small>
-        </section>
-
-        <section className="inventory-drawer-section">
-          <header>
-            <SlidersHorizontal size={15} />
-            <span>Reorder settings</span>
-          </header>
-
-          <label className="reorder-setting">
-            <span>
-              Reorder level
-            </span>
-
-            <input
-              type="number"
-              min="0"
-              defaultValue={
-                item.reorderLevel
-              }
-            />
-          </label>
-        </section>
-
-        <section className="inventory-drawer-section">
-          <header>
-            <History size={15} />
-            <span>Recent movement</span>
-          </header>
-
-          <div className="inventory-history">
-            <div>
-              <span>Stock received</span>
-              <strong>
-                +20
-              </strong>
-              <small>
-                Bhiwandi · 23 Sep
-              </small>
-            </div>
-
-            <div>
-              <span>Order reserved</span>
-              <strong className="negative">
-                -2
-              </strong>
-              <small>
-                Order D2C24092381
-              </small>
-            </div>
-
-            <div>
-              <span>Warehouse transfer</span>
-              <strong>
-                +5
-              </strong>
-              <small>
-                Bengaluru · 22 Sep
-              </small>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div className="inventory-drawer-footer">
-        <button
-          type="button"
-          onClick={onClose}
-        >
-          Cancel
-        </button>
-
-        <button
-          type="button"
-          onClick={saveInventory}
-        >
-          Save inventory
-        </button>
-      </div>
-    </motion.aside>
-  );
-}
-
-export default function AdminInventoryPage({
-  inventory: externalInventory,
-  onInventoryUpdate,
-}) {
-  const [inventory, setInventory] =
-    useState(
-      externalInventory ||
-        INITIAL_INVENTORY
-    );
-
-  const [search, setSearch] =
-    useState("");
-
-  const [category, setCategory] =
-    useState("All");
-
-  const [stockStatus, setStockStatus] =
-    useState("All");
-
-  const [warehouse, setWarehouse] =
-    useState("All");
-
-  const [sort, setSort] =
-    useState("stock-low");
-
-  const [page, setPage] =
-    useState(1);
-
-  const [pageSize, setPageSize] =
-    useState(6);
-
-  const [selectedItem, setSelectedItem] =
-    useState(null);
-
-  const [mobileFilters, setMobileFilters] =
-    useState(false);
-
-  const filteredInventory =
-    useMemo(() => {
-      const query =
-        search.trim().toLowerCase();
-
-      const result =
-        inventory.filter((item) => {
-          const matchesSearch =
-            !query ||
-            `${item.sku} ${item.product} ${item.brand} ${item.category}`
-              .toLowerCase()
-              .includes(query);
-
-          const matchesCategory =
-            category === "All" ||
-            item.category ===
-              category;
-
-          const matchesStock =
-            stockStatus === "All" ||
-            (stockStatus ===
-              "In stock" &&
-              item.available >
-                item.reorderLevel) ||
-            (stockStatus ===
-              "Low stock" &&
-              item.available > 0 &&
-              item.available <=
-                item.reorderLevel) ||
-            (stockStatus ===
-              "Out of stock" &&
-              item.available ===
-                0);
-
-          const matchesWarehouse =
-            warehouse === "All" ||
-            (item.warehouses[
-              warehouse
-            ] || 0) > 0;
-
-          return (
-            matchesSearch &&
-            matchesCategory &&
-            matchesStock &&
-            matchesWarehouse
-          );
-        });
-
-      return [...result].sort(
-        (a, b) => {
-          if (
-            sort ===
-            "stock-high"
-          ) {
-            return (
-              b.available -
-              a.available
-            );
-          }
-
-          if (
-            sort ===
-            "stock-low"
-          ) {
-            return (
-              a.available -
-              b.available
-            );
-          }
-
-          if (
-            sort ===
-            "reserved-high"
-          ) {
-            return (
-              b.reserved -
-              a.reserved
-            );
-          }
-
-          return a.product.localeCompare(
-            b.product
-          );
+    <div className="col gap-16">
+      <AdminHeader
+        eyebrow="Inventory management"
+        title="Inventory"
+        sub={admin.warehouseId ? `Stock at ${getWarehouse(admin.warehouseId).name}` : "Stock across all 4 fulfilment hubs"}
+        actions={
+          <button className="btn btn-sm btn-outline" onClick={() => exportCsv("inventory.csv", rows.map((r) => ({ sku: r.p.sku, product: r.p.name, brand: r.p.brand, warehouse: r.w.short, available: r.available, reserved: r.reserved, sellable: r.sellable, sold: r.sold, threshold: r.threshold })))}>
+            <Download size={14} /> Export
+          </button>
         }
-      );
-    }, [
-      inventory,
-      search,
-      category,
-      stockStatus,
-      warehouse,
-      sort,
-    ]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(
-      filteredInventory.length /
-        pageSize
-    )
-  );
-
-  const currentPage =
-    Math.min(page, totalPages);
-
-  const visibleInventory =
-    filteredInventory.slice(
-      (currentPage - 1) *
-        pageSize,
-      currentPage * pageSize
-    );
-
-  const totals = useMemo(() => {
-    const total = inventory.reduce(
-      (sum, item) =>
-        sum + item.total,
-      0
-    );
-
-    const reserved =
-      inventory.reduce(
-        (sum, item) =>
-          sum + item.reserved,
-        0
-      );
-
-    const available =
-      inventory.reduce(
-        (sum, item) =>
-          sum + item.available,
-        0
-      );
-
-    const lowStock =
-      inventory.filter(
-        (item) =>
-          item.available > 0 &&
-          item.available <=
-            item.reorderLevel
-      ).length;
-
-    const outOfStock =
-      inventory.filter(
-        (item) =>
-          item.available === 0
-      ).length;
-
-    return {
-      total,
-      reserved,
-      available,
-      lowStock,
-      outOfStock,
-    };
-  }, [inventory]);
-
-  const warehouseTotals =
-    useMemo(
-      () =>
-        WAREHOUSES.map(
-          (warehouse) => ({
-            ...warehouse,
-            quantity:
-              inventory.reduce(
-                (sum, item) =>
-                  sum +
-                  (item
-                    .warehouses[
-                    warehouse
-                      .name
-                  ] || 0),
-                0
-              ),
-          })
-        ),
-      [inventory]
-    );
-
-  const updateInventory =
-    (updatedItem) => {
-      setInventory((current) =>
-        current.map((item) =>
-          item.sku ===
-          updatedItem.sku
-            ? updatedItem
-            : item
-        )
-      );
-
-      setSelectedItem(null);
-
-      onInventoryUpdate?.(
-        updatedItem
-      );
-    };
-
-  const resetFilters = () => {
-    setSearch("");
-    setCategory("All");
-    setStockStatus("All");
-    setWarehouse("All");
-    setSort("stock-low");
-    setPage(1);
-  };
-
-  const hasFilters =
-    search ||
-    category !== "All" ||
-    stockStatus !== "All" ||
-    warehouse !== "All";
-
-  return (
-    <main className="admin-inventory-page">
-      <div className="admin-inventory-heading">
-        <div>
-          <span>INVENTORY OPERATIONS</span>
-          <h1>Inventory</h1>
-          <p>
-            Track stock across warehouses, reservations and
-            replenishment levels.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          className="inventory-add-button"
-        >
-          <Plus size={14} />
-          Add stock
-        </button>
+      />
+      <div className="adm-kpis">
+        <Kpi icon={Boxes} label="Units available" value={formatNumber(totals.available)} tone="blue" />
+        <Kpi icon={Lock} label="Reserved (in checkout)" value={formatNumber(totals.reserved)} tone="amber" delta={`${activeRes.length} active reservations`} />
+        <Kpi icon={Boxes} label="Units sold" value={formatNumber(totals.sold)} tone="green" />
+        <Kpi icon={AlertTriangle} label="Low stock rows" value={totals.low} tone="orange" />
+        <Kpi icon={AlertTriangle} label="Out of stock rows" value={totals.out} tone="red" />
+        <Kpi icon={History} label="Stock movements" value={moves.length} tone="purple" delta="Audit log" />
       </div>
 
-      <section className="inventory-kpis">
-        <div>
-          <span>TOTAL UNITS</span>
-          <strong>
-            {totals.total.toLocaleString(
-              "en-IN"
-            )}
-          </strong>
-          <small>
-            Across all warehouses
-          </small>
-        </div>
+      <div className="seg">
+        <button className={cx(tab === "stock" && "active")} onClick={() => setTab("stock")}>Stock by warehouse</button>
+        <button className={cx(tab === "reservations" && "active")} onClick={() => setTab("reservations")}>Reservations ({activeRes.length})</button>
+        <button className={cx(tab === "moves" && "active")} onClick={() => setTab("moves")}>Movement history</button>
+      </div>
 
-        <div>
-          <span>AVAILABLE</span>
-          <strong>
-            {totals.available.toLocaleString(
-              "en-IN"
-            )}
-          </strong>
-          <small>
-            Ready to sell
-          </small>
-        </div>
-
-        <div>
-          <span>RESERVED</span>
-          <strong>
-            {totals.reserved.toLocaleString(
-              "en-IN"
-            )}
-          </strong>
-          <small>
-            Held against orders
-          </small>
-        </div>
-
-        <div>
-          <span>LOW STOCK</span>
-          <strong className="warning">
-            {totals.lowStock}
-          </strong>
-          <small>
-            Need replenishment
-          </small>
-        </div>
-
-        <div>
-          <span>OUT OF STOCK</span>
-          <strong className="danger">
-            {totals.outOfStock}
-          </strong>
-          <small>
-            Currently unavailable
-          </small>
-        </div>
-      </section>
-
-      <section className="warehouse-overview">
-        <div className="inventory-section-title">
-          <div>
-            <span>NETWORK</span>
-            <h2>Warehouse stock</h2>
+      {tab === "stock" ? (
+        <>
+          <div className="adm-toolbar">
+            <div className="input-group" style={{ flex: 1, minWidth: 220 }}>
+              <span className="addon"><Search size={15} /></span>
+              <input className="input" placeholder="Search SKU, product or brand" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            <select className="select" style={{ width: "auto" }} value={wh} onChange={(e) => setWh(e.target.value)} disabled={!!admin.warehouseId}>
+              <option value="all">All warehouses</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>{w.short}</option>
+              ))}
+            </select>
+            <select className="select" style={{ width: "auto" }} value={cat} onChange={(e) => setCat(e.target.value)}>
+              <option value="all">All categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <label className="check small">
+              <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} /> Low stock only
+            </label>
           </div>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>SKU / Product</th>
+                  <th>Brand</th>
+                  <th>Warehouse</th>
+                  <th className="num">Available</th>
+                  <th className="num">Reserved</th>
+                  <th className="num">Sellable</th>
+                  <th className="num">Sold</th>
+                  <th className="num">Threshold</th>
+                  <th>Status</th>
+                  {canEdit ? <th>Actions</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 200).map((r) => (
+                  <tr key={`${r.p.id}-${r.w.id}`}>
+                    <td>
+                      <div className="row gap-10">
+                        <Img src={r.p.images[0]} alt="" label="" style={{ width: 36, height: 36, borderRadius: 8 }} />
+                        <div style={{ minWidth: 0 }}>
+                          <b className="xs">{r.p.sku}</b>
+                          <div className="xs muted ellipsis" style={{ maxWidth: 200 }}>{r.p.name}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="xs">{r.p.brand}</td>
+                    <td className="xs">
+                      <span className="row gap-4"><i className="wh-dot" style={{ background: r.w.color }} /> {r.w.short}</span>
+                    </td>
+                    <td className="num small">{r.available}</td>
+                    <td className="num small">{r.reserved ? <span className="text-orange bold">{r.reserved}</span> : 0}</td>
+                    <td className="num small bold">{r.sellable}</td>
+                    <td className="num small muted">{r.sold}</td>
+                    <td className="num small">{r.threshold}</td>
+                    <td>
+                      {r.out ? <span className="badge badge-soft-red">Out of stock</span> : r.low ? <span className="badge badge-soft-amber">Low</span> : <span className="badge badge-soft-green">Healthy</span>}
+                    </td>
+                    {canEdit ? (
+                      <td>
+                        <div className="row gap-4">
+                          <button className="icon-btn sm" title="Adjust stock" onClick={() => setAdjust({ ...r, delta: 10, thr: r.threshold })}>
+                            <SlidersHorizontal size={15} />
+                          </button>
+                          {!admin.warehouseId || admin.warehouseId === r.w.id ? (
+                            <button className="icon-btn sm" title="Transfer" onClick={() => setTransfer({ ...r, to: warehouses.find((w) => w.id !== r.w.id).id, qty: Math.min(5, Math.max(r.sellable, 0)) })}>
+                              <ArrowRightLeft size={15} />
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {rows.length > 200 ? <p className="xs muted center" style={{ padding: 12 }}>Showing first 200 rows — refine filters to see more.</p> : null}
+          </div>
+        </>
+      ) : null}
 
-          <button type="button">
-            Manage warehouses
-          </button>
-        </div>
-
-        <div className="warehouse-overview-grid">
-          {warehouseTotals.map(
-            (item) => (
-              <article
-                key={item.name}
-              >
-                <div className="warehouse-card-top">
-                  <div>
-                    <Warehouse
-                      size={15}
-                    />
-
-                    <div>
-                      <strong>
-                        {item.name}
-                      </strong>
-                      <span>
-                        {item.city} ·{" "}
-                        {item.code}
-                      </span>
-                    </div>
-                  </div>
-
-                  <MapPin
-                    size={13}
-                  />
-                </div>
-
-                <strong className="warehouse-total">
-                  {item.quantity}
-                  <small>
-                    units
-                  </small>
-                </strong>
-
-                <div className="warehouse-capacity">
-                  <span
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        item.quantity
-                      )}%`,
-                    }}
-                  />
-                </div>
-
-                <footer>
-                  <span>
-                    Active inventory
-                  </span>
-                  <strong>
-                    Operational
-                  </strong>
-                </footer>
-              </article>
-            )
-          )}
-        </div>
-      </section>
-
-      <section className="inventory-toolbar">
-        <div className="inventory-search">
-          <Search size={15} />
-
-          <input
-            value={search}
-            onChange={(event) => {
-              setSearch(
-                event.target.value
-              );
-              setPage(1);
-            }}
-            placeholder="Search SKU, product or brand..."
-          />
-        </div>
-
-        <div className="inventory-filter-row">
-          <label>
-            <span>Category</span>
-            <div>
-              <select
-                value={category}
-                onChange={(event) => {
-                  setCategory(
-                    event.target.value
-                  );
-                  setPage(1);
-                }}
-              >
-                {FILTER_OPTIONS.map(
-                  (option) => (
-                    <option
-                      key={option}
-                    >
-                      {option}
-                    </option>
-                  )
-                )}
-              </select>
-              <ChevronDown
-                size={12}
-              />
-            </div>
-          </label>
-
-          <label>
-            <span>Stock</span>
-            <div>
-              <select
-                value={stockStatus}
-                onChange={(event) => {
-                  setStockStatus(
-                    event.target.value
-                  );
-                  setPage(1);
-                }}
-              >
-                {STOCK_OPTIONS.map(
-                  (option) => (
-                    <option
-                      key={option}
-                    >
-                      {option}
-                    </option>
-                  )
-                )}
-              </select>
-              <ChevronDown
-                size={12}
-              />
-            </div>
-          </label>
-
-          <label>
-            <span>Warehouse</span>
-            <div>
-              <select
-                value={warehouse}
-                onChange={(event) => {
-                  setWarehouse(
-                    event.target.value
-                  );
-                  setPage(1);
-                }}
-              >
-                <option>
-                  All
-                </option>
-
-                {WAREHOUSES.map(
-                  (item) => (
-                    <option
-                      key={item.name}
-                    >
-                      {item.name}
-                    </option>
-                  )
-                )}
-              </select>
-              <ChevronDown
-                size={12}
-              />
-            </div>
-          </label>
-
-          <label>
-            <span>Sort</span>
-            <div>
-              <select
-                value={sort}
-                onChange={(event) => {
-                  setSort(
-                    event.target.value
-                  );
-                  setPage(1);
-                }}
-              >
-                <option value="stock-low">
-                  Lowest stock
-                </option>
-                <option value="stock-high">
-                  Highest stock
-                </option>
-                <option value="reserved-high">
-                  Highest reserved
-                </option>
-                <option value="name">
-                  Product name
-                </option>
-              </select>
-              <ChevronDown
-                size={12}
-              />
-            </div>
-          </label>
-
-          <button
-            type="button"
-            className="inventory-mobile-filter"
-            onClick={() =>
-              setMobileFilters(
-                true
-              )
-            }
-          >
-            <SlidersHorizontal
-              size={14}
-            />
-            Filters
-          </button>
-        </div>
-      </section>
-
-      {hasFilters && (
-        <div className="inventory-active-filters">
-          <span>
-            {filteredInventory.length}{" "}
-            SKUs matching filters
-          </span>
-
-          <button
-            type="button"
-            onClick={resetFilters}
-          >
-            Clear filters
-            <X size={12} />
-          </button>
-        </div>
-      )}
-
-      <section className="inventory-table-panel">
-        <div className="inventory-table-wrapper">
-          <table className="inventory-table">
+      {tab === "reservations" ? (
+        <div className="table-wrap">
+          <table className="table">
             <thead>
               <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    aria-label="Select all inventory"
-                  />
-                </th>
-                <th>PRODUCT / SKU</th>
-                <th>CATEGORY</th>
-                <th>TOTAL</th>
-                <th>RESERVED</th>
-                <th>AVAILABLE</th>
-                <th>STOCK STATUS</th>
-                <th>WAREHOUSE DISTRIBUTION</th>
-                <th>UPDATED</th>
+                <th>Reservation</th>
+                <th>Order</th>
+                <th>Items</th>
+                <th>Expires</th>
                 <th />
               </tr>
             </thead>
-
             <tbody>
-              {visibleInventory.map(
-                (item) => (
-                  <tr
-                    key={item.sku}
-                    onClick={() =>
-                      setSelectedItem(
-                        item
-                      )
-                    }
-                  >
-                    <td
-                      onClick={(event) =>
-                        event.stopPropagation()
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${item.sku}`}
-                      />
-                    </td>
-
-                    <td>
-                      <div className="inventory-product-cell">
-                        <div className="inventory-product-icon">
-                          <Package
-                            size={17}
-                          />
-                        </div>
-
-                        <div>
-                          <strong>
-                            {item.product}
-                          </strong>
-                          <span>
-                            {item.brand}
-                          </span>
-                          <small>
-                            {item.sku}
-                          </small>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td>
-                      <span className="inventory-category">
-                        {item.category}
-                      </span>
-                    </td>
-
-                    <td>
-                      <strong>
-                        {item.total}
-                      </strong>
-                    </td>
-
-                    <td>
-                      <span className="reserved-value">
-                        {item.reserved}
-                      </span>
-                    </td>
-
-                    <td>
-                      <strong className="available-value">
-                        {item.available}
-                      </strong>
-                    </td>
-
-                    <td>
-                      <StockBadge
-                        available={
-                          item.available
-                        }
-                        reorderLevel={
-                          item.reorderLevel
-                        }
-                      />
-                    </td>
-
-                    <td>
-                      <div className="warehouse-distribution">
-                        {WAREHOUSES.map(
-                          (
-                            warehouse
-                          ) => (
-                            <WarehouseBar
-                              key={
-                                warehouse.name
-                              }
-                              warehouse={
-                                warehouse.name
-                              }
-                              quantity={
-                                item
-                                  .warehouses[
-                                  warehouse
-                                    .name
-                                ] ||
-                                0
-                              }
-                              total={
-                                item.total
-                              }
-                            />
-                          )
-                        )}
-                      </div>
-                    </td>
-
-                    <td>
-                      <span className="inventory-updated">
-                        {item.updated}
-                      </span>
-                    </td>
-
-                    <td>
-                      <button
-                        type="button"
-                        className="inventory-edit-button"
-                        onClick={(
-                          event
-                        ) => {
-                          event.stopPropagation();
-                          setSelectedItem(
-                            item
-                          );
-                        }}
-                      >
-                        <Edit3
-                          size={14}
-                        />
+              {activeRes.map((r) => (
+                <tr key={r.id}>
+                  <td className="xs"><b>{r.id}</b><div className="muted">{formatDateTime(r.createdAt)}</div></td>
+                  <td className="small">{r.orderId}</td>
+                  <td className="xs">{r.items.map((i) => `${productMap[i.productId]?.sku} ×${i.qty} @ ${getWarehouse(i.warehouseId).short}`).join(", ")}</td>
+                  <td className="xs">{Math.max(0, Math.round((r.expiresAt - Date.now()) / 60000))} min</td>
+                  <td>
+                    {canEdit ? (
+                      <button className="btn btn-xs btn-outline" onClick={() => { releaseReservation(r.orderId, "release"); toast("Reservation released"); }}>
+                        <Unlock size={12} /> Release
                       </button>
-                    </td>
-                  </tr>
-                )
-              )}
-
-              {visibleInventory.length ===
-                0 && (
-                <tr>
-                  <td
-                    colSpan="10"
-                    className="inventory-empty"
-                  >
-                    <Package
-                      size={25}
-                    />
-
-                    <strong>
-                      No inventory found
-                    </strong>
-
-                    <span>
-                      Try changing your
-                      search or filters.
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={
-                        resetFilters
-                      }
-                    >
-                      Clear filters
-                    </button>
+                    ) : null}
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
+          {!activeRes.length ? <p className="small muted center" style={{ padding: 24 }}>No active reservations. Stock is reserved for 15 minutes during checkout and auto-released on payment failure or timeout.</p> : null}
         </div>
+      ) : null}
 
-        <footer className="inventory-pagination">
-          <span>
-            Showing{" "}
-            <strong>
-              {visibleInventory.length}
-            </strong>{" "}
-            of{" "}
-            <strong>
-              {filteredInventory.length}
-            </strong>{" "}
-            SKUs
-          </span>
+      {tab === "moves" ? (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Type</th>
+                <th>SKU</th>
+                <th>Warehouse</th>
+                <th className="num">Qty</th>
+                <th>Reference</th>
+                <th>By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {moves.slice(0, 150).map((m) => (
+                <tr key={m.id}>
+                  <td className="xs">{timeAgo(m.at)}</td>
+                  <td><span className={cx("badge", MOVE_LABEL[m.type]?.[1] || "badge-soft-gray")}>{MOVE_LABEL[m.type]?.[0] || m.type}</span></td>
+                  <td className="xs"><b>{productMap[m.productId]?.sku}</b></td>
+                  <td className="xs">{getWarehouse(m.warehouseId)?.short}</td>
+                  <td className="num small">{m.qty}</td>
+                  <td className="xs muted">{m.ref}</td>
+                  <td className="xs">{m.by}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!moves.length ? <p className="small muted center" style={{ padding: 24 }}>No movements yet. Place an order on the storefront to see reserve → sale entries appear here.</p> : null}
+        </div>
+      ) : null}
 
-          <div>
-            <label>
-              Rows
-              <select
-                value={pageSize}
-                onChange={(event) => {
-                  setPageSize(
-                    Number(
-                      event.target.value
-                    )
-                  );
-                  setPage(1);
-                }}
-              >
-                <option value="6">
-                  6
-                </option>
-                <option value="10">
-                  10
-                </option>
-                <option value="20">
-                  20
-                </option>
-              </select>
-            </label>
-
+      <Modal
+        open={!!adjust}
+        onClose={() => setAdjust(null)}
+        title={`Adjust stock · ${adjust?.p.sku} @ ${adjust?.w.short}`}
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setAdjust(null)}>Cancel</button>
             <button
-              type="button"
-              disabled={
-                currentPage === 1
-              }
-              onClick={() =>
-                setPage(
-                  (current) =>
-                    Math.max(
-                      1,
-                      current - 1
-                    )
-                )
-              }
+              className="btn btn-blue"
+              onClick={() => {
+                if (adjust.delta) adjustStock(adjust.p.id, adjust.w.id, Number(adjust.delta), admin.name, adjust.delta > 0 ? "Inward / GRN" : "Damage / shrinkage");
+                if (Number(adjust.thr) !== adjust.threshold) setThreshold(adjust.p.id, adjust.w.id, Number(adjust.thr));
+                toast("Inventory updated");
+                setAdjust(null);
+              }}
             >
-              <ChevronLeft
-                size={14}
-              />
+              Save
             </button>
-
-            <span>
-              {currentPage} /{" "}
-              {totalPages}
-            </span>
-
-            <button
-              type="button"
-              disabled={
-                currentPage ===
-                totalPages
-              }
-              onClick={() =>
-                setPage(
-                  (current) =>
-                    Math.min(
-                      totalPages,
-                      current + 1
-                    )
-                )
-              }
-            >
-              <ChevronRight
-                size={14}
-              />
-            </button>
+          </>
+        }
+      >
+        {adjust ? (
+          <div className="col gap-16">
+            <div className="soft-panel small">
+              Available <b>{adjust.available}</b> · Reserved <b>{adjust.reserved}</b> · Sellable <b>{adjust.sellable}</b>
+            </div>
+            <div className="field">
+              <label>Change quantity (+ inward / − damage)</label>
+              <div className="row">
+                <button className="btn btn-outline" onClick={() => setAdjust({ ...adjust, delta: Number(adjust.delta) - 1 })}><Minus size={15} /></button>
+                <input className="input" type="number" value={adjust.delta} onChange={(e) => setAdjust({ ...adjust, delta: e.target.value })} style={{ textAlign: "center" }} />
+                <button className="btn btn-outline" onClick={() => setAdjust({ ...adjust, delta: Number(adjust.delta) + 1 })}><Plus size={15} /></button>
+              </div>
+              <span className="hint">New available: {Math.max(0, adjust.available + Number(adjust.delta || 0))}</span>
+            </div>
+            <div className="field">
+              <label>Low-stock threshold</label>
+              <input className="input" type="number" min={0} value={adjust.thr} onChange={(e) => setAdjust({ ...adjust, thr: e.target.value })} />
+            </div>
           </div>
-        </footer>
-      </section>
+        ) : null}
+      </Modal>
 
-      {mobileFilters && (
-        <motion.div
-          className="inventory-mobile-drawer"
-          initial={{
-            x: "100%",
-          }}
-          animate={{
-            x: 0,
-          }}
-        >
-          <div>
-            <strong>
-              Inventory filters
-            </strong>
-
+      <Modal
+        open={!!transfer}
+        onClose={() => setTransfer(null)}
+        title={`Transfer ${transfer?.p.sku}`}
+        footer={
+          <>
+            <button className="btn btn-outline" onClick={() => setTransfer(null)}>Cancel</button>
             <button
-              type="button"
-              onClick={() =>
-                setMobileFilters(
-                  false
-                )
-              }
+              className="btn btn-blue"
+              onClick={() => {
+                const r = transferStock(transfer.p.id, transfer.w.id, transfer.to, Number(transfer.qty), admin.name);
+                if (!r.ok) return toast.error(r.reason);
+                toast(`Transfer ${r.ref} created`);
+                setTransfer(null);
+              }}
             >
-              <X size={17} />
+              <ArrowRightLeft size={15} /> Transfer
             </button>
+          </>
+        }
+      >
+        {transfer ? (
+          <div className="col gap-16">
+            <div className="form-grid">
+              <div className="field">
+                <label>From</label>
+                <input className="input" value={transfer.w.name} disabled />
+              </div>
+              <div className="field">
+                <label>To</label>
+                <select className="select" value={transfer.to} onChange={(e) => setTransfer({ ...transfer, to: e.target.value })}>
+                  {warehouses.filter((w) => w.id !== transfer.w.id).map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field span-2">
+                <label>Quantity (max {transfer.sellable} unreserved)</label>
+                <input className="input" type="number" min={1} max={transfer.sellable} value={transfer.qty} onChange={(e) => setTransfer({ ...transfer, qty: e.target.value })} />
+              </div>
+            </div>
+            <p className="xs muted">Creates a transfer-out and transfer-in movement pair in the audit log.</p>
           </div>
-
-          <label>
-            Category
-
-            <select
-              value={category}
-              onChange={(event) =>
-                setCategory(
-                  event.target.value
-                )
-              }
-            >
-              {FILTER_OPTIONS.map(
-                (option) => (
-                  <option
-                    key={option}
-                  >
-                    {option}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <label>
-            Stock
-
-            <select
-              value={stockStatus}
-              onChange={(event) =>
-                setStockStatus(
-                  event.target.value
-                )
-              }
-            >
-              {STOCK_OPTIONS.map(
-                (option) => (
-                  <option
-                    key={option}
-                  >
-                    {option}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <label>
-            Warehouse
-
-            <select
-              value={warehouse}
-              onChange={(event) =>
-                setWarehouse(
-                  event.target.value
-                )
-              }
-            >
-              <option>
-                All
-              </option>
-
-              {WAREHOUSES.map(
-                (item) => (
-                  <option
-                    key={item.name}
-                  >
-                    {item.name}
-                  </option>
-                )
-              )}
-            </select>
-          </label>
-
-          <button
-            type="button"
-            onClick={() => {
-              setPage(1);
-              setMobileFilters(
-                false
-              );
-            }}
-          >
-            Apply filters
-          </button>
-        </motion.div>
-      )}
-
-      {selectedItem && (
-        <>
-          <div
-            className="inventory-drawer-backdrop"
-            onClick={() =>
-              setSelectedItem(null)
-            }
-          />
-
-          <InventoryDrawer
-            item={selectedItem}
-            onClose={() =>
-              setSelectedItem(null)
-            }
-            onSave={
-              updateInventory
-            }
-          />
-        </>
-      )}
-    </main>
+        ) : null}
+      </Modal>
+    </div>
   );
 }
