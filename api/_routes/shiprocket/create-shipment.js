@@ -3,9 +3,9 @@
  * Creates a Shiprocket ad-hoc order for one D2C Mall shipment, assigns an AWB
  * (optionally a specific courier) and schedules pickup from the warehouse.
  */
-import { ApiError, handler, readJson, validate } from "../_lib/http.js";
-import { requireAuth } from "../_lib/auth.js";
-import { PICKUP_LOCATIONS, sr } from "../_lib/shiprocket.js";
+import { ApiError, handler, readJson, validate } from "../../_lib/http.js";
+import { requireAuth } from "../../_lib/auth.js";
+import { PICKUP_LOCATIONS, sr } from "../../_lib/shiprocket.js";
 
 export default handler(
   ["POST"],

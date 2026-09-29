@@ -6,7 +6,7 @@
  * be confirmed and stock committed.
  */
 import crypto from "node:crypto";
-import { handler, readJson, requireEnv, validate } from "../_lib/http.js";
+import { handler, readJson, requireEnv, validate } from "../../_lib/http.js";
 
 export default handler(
   ["POST"],

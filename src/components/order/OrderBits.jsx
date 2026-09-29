@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api, live, useBackend } from "../../lib/api";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Check, Copy, MapPin, PackageCheck, Printer, Truck, Warehouse } from "lucide-react";
 import { getCourier, getWarehouse } from "../../data/logistics";
@@ -96,7 +97,48 @@ export function ShipmentCard({ order, shipment, now, children }) {
   );
 }
 
+/** Poll Shiprocket tracking for shipments created on the live backend. */
+export function useLiveTracking(awb, enabled) {
+  const status = useBackend();
+  const [data, setData] = useState(null);
+  const on = enabled && status.available && live("shiprocket") && !!awb;
+  useEffect(() => {
+    if (!on) return undefined;
+    let alive = true;
+    const load = () =>
+      api(`/shiprocket/track?awb=${encodeURIComponent(awb)}`)
+        .then((d) => alive && setData(d))
+        .catch(() => {});
+    load();
+    const t = setInterval(load, 30000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [awb, on]);
+  return on ? data : null;
+}
+
 export function ShipmentEvents({ shipment, now, city }) {
+  const liveData = useLiveTracking(shipment.awb, shipment.provider === "shiprocket-live");
+  if (liveData?.events?.length) {
+    return (
+      <div className="timeline">
+        <div className="xs text-green bold mb-8 row gap-6">
+          <span className="live-dot" /> Live from {liveData.courier || "Shiprocket"} · {liveData.rawStatus}
+        </div>
+        {liveData.events.map((e, i) => (
+          <div key={`${e.at}-${i}`} className={cx("tl-item", i === 0 ? "current" : "done")}>
+            <span className="tl-dot"><Check size={12} /></span>
+            <div>
+              <div className="tl-title">{e.note}</div>
+              <div className="tl-meta"><MapPin size={11} /> {e.location} · {e.at}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
   const events = [...shipmentEvents(shipment, now)].reverse();
   const next = shipment.plan.find((e) => e.at > now);
   return (

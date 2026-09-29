@@ -2,8 +2,8 @@
  * Pricing & coupon engine. The backend runs the same rules again before
  * creating a payment order — the frontend result is only a preview.
  */
-import { coupons, findCoupon } from "../data/coupons";
-import { formatINR } from "./format";
+import { coupons, findCoupon } from "../data/coupons.js";
+import { formatINR } from "./format.js";
 
 export const FREE_SHIPPING_THRESHOLD = 499;
 export const STANDARD_SHIPPING = 49;

@@ -5,7 +5,7 @@
  * correct even if the customer closes the browser mid-payment.
  */
 import crypto from "node:crypto";
-import { ApiError, handler, readRaw, requireEnv } from "../_lib/http.js";
+import { ApiError, handler, readRaw, requireEnv } from "../../_lib/http.js";
 
 export default handler(
   ["POST"],
