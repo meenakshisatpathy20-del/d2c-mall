@@ -9,6 +9,7 @@
  *            so the full flow — success, failure, retry, abandon — can be demoed.
  */
 import { hmacSha256, randomId } from "../crypto";
+import { getState } from "../store";
 
 const KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
 const API = import.meta.env.VITE_API_BASE || "/api";
@@ -30,9 +31,12 @@ export async function createGatewayOrder({ orderId, amount, customer, order }) {
   if (KEY_ID) {
     const res = await fetch(`${API}/payments/create-order`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(getState().session?.serverToken ? { Authorization: `Bearer ${getState().session.serverToken}` } : {}) },
       body: JSON.stringify({
         receipt: orderId,
+        giftWrap: !!order?.extras?.giftWrap,
+        credits: order?.pricing?.creditsUsed || 0,
+        coins: order?.pricing?.coinsUsed || 0,
         amount: Math.round(amount * 100),
         currency: "INR",
         notes: { orderId, customer },

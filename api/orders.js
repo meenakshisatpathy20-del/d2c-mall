@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import { ApiError, handler, readJson, validate } from "./_lib/http.js";
 import { requireAuth, verifyJwt } from "./_lib/auth.js";
 import { db, dbConfigured } from "./_lib/db.js";
-import { serverSummary } from "./_lib/pricing.js";
+import { serverSummary, verifyWallet } from "./_lib/pricing.js";
 import { PICKUP_LOCATIONS, sr } from "./_lib/shiprocket.js";
 import { sendNotification } from "./_lib/notify.js";
 import { router } from "./_lib/router.js";
@@ -88,11 +88,16 @@ const confirm = handler(
     if (!cod && !verifySignature(payment)) throw new ApiError(400, "SIGNATURE_INVALID", "Payment signature verification failed");
 
     // 2. Re-price on the server
+    const wallet = order.wallet || {};
+    const walletUser = await verifyWallet({ credits: wallet.credits, coins: wallet.coins, claims, db, dbConfigured });
     const { items, summary } = serverSummary({
       items: order.items,
       couponCode: order.pricing?.couponCode,
       paymentMethod: cod ? "cod" : order.payment?.method,
       deliverySpeed: order.deliverySpeed,
+      giftWrap: order.extras?.giftWrap,
+      credits: wallet.credits,
+      coins: wallet.coins,
     });
 
     // 3. Idempotency — one order per checkout attempt / payment
@@ -122,6 +127,12 @@ const confirm = handler(
       },
       serverConfirmedAt: Date.now(),
     };
+
+    if (walletUser) {
+      walletUser.credits = (walletUser.credits || 0) - (summary.creditsUsed || 0);
+      walletUser.coins = (walletUser.coins || 0) - (summary.coinsUsed || 0);
+      await db.set(`user:${walletUser.email}`, walletUser);
+    }
 
     // 4. Shipments via Shiprocket
     const shipping = await createShipments(record);

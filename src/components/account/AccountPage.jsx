@@ -5,6 +5,10 @@ import {
   Bell,
   Bookmark,
   Briefcase,
+  Coins,
+  FileText,
+  Ticket,
+  Users,
   ChevronDown,
   ChevronRight,
   CreditCard,
@@ -60,6 +64,7 @@ import { toast } from "../../lib/toast";
 import WishlistDrawer from "../wishlist/WishlistDrawer";
 import { Empty, Field, Img, Modal, StatusPill, Switch, useDocumentTitle } from "../common/ui";
 import AddressForm from "./AddressForm";
+import { CoinsPanel, GiftCards, MyCoupons, MyReviews, ReferEarn, TaxDetails } from "./AccountExtras";
 import { SupportModal } from "../order/OrderBits";
 import "./AccountPage.css";
 
@@ -71,6 +76,12 @@ const NAV = [
   { id: "returns", label: "Returns & refunds", icon: RotateCcw, to: "/returns" },
   { id: "wishlist", label: "Wishlist", icon: Heart, to: "/wishlist" },
   { id: "payments", label: "Payments & credits", icon: Wallet },
+  { id: "coupons", label: "My coupons", icon: Ticket },
+  { id: "coins", label: "D2C Coins", icon: Coins },
+  { id: "giftcards", label: "Gift cards", icon: Gift },
+  { id: "reviews", label: "Reviews & ratings", icon: Star },
+  { id: "refer", label: "Refer & earn", icon: Users },
+  { id: "tax", label: "PAN & GST details", icon: FileText },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "looks", label: "Saved looks", icon: Bookmark },
   { id: "settings", label: "Settings", icon: Settings },
@@ -816,6 +827,12 @@ export default function AccountPage() {
       case "profile": return <Profile user={user} />;
       case "addresses": return <Addresses user={user} />;
       case "payments": return <Payments user={user} />;
+      case "coupons": return <MyCoupons user={user} />;
+      case "coins": return <CoinsPanel user={user} />;
+      case "giftcards": return <GiftCards user={user} />;
+      case "reviews": return <MyReviews user={user} />;
+      case "refer": return <ReferEarn user={user} />;
+      case "tax": return <TaxDetails user={user} />;
       case "notifications": return <Notifications user={user} />;
       case "looks": return <Looks />;
       case "settings": return <SettingsPanel user={user} />;

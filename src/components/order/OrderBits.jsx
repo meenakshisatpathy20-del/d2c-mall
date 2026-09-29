@@ -220,6 +220,7 @@ export function InvoiceModal({ order, open, onClose }) {
               {order.address.city}, {order.address.state} – {order.address.pincode}
             </div>
             <div>Ph: {order.address.phone}</div>
+            {order.extras?.gstin ? <div><b>{order.extras.businessName}</b> · GSTIN {order.extras.gstin}</div> : null}
           </div>
           <div className="soft-panel xs">
             <b>Payment</b>
@@ -261,6 +262,7 @@ export function InvoiceModal({ order, open, onClose }) {
           {order.pricing.couponDiscount ? <div><span>Coupon ({order.pricing.couponCode})</span><span>−{formatINR(order.pricing.couponDiscount)}</span></div> : null}
           <div><span>Shipping</span><span>{formatINR(order.pricing.shipping)}</span></div>
           {order.pricing.codFee ? <div><span>COD fee</span><span>{formatINR(order.pricing.codFee)}</span></div> : null}
+          {order.pricing.giftWrapFee ? <div><span>Gift wrap</span><span>{formatINR(order.pricing.giftWrapFee)}</span></div> : null}
           <div><span>Taxable value</span><span>{formatINR(taxable)}</span></div>
           {intra ? (
             <>
@@ -270,6 +272,7 @@ export function InvoiceModal({ order, open, onClose }) {
           ) : (
             <div><span>IGST @12%</span><span>{formatINR(gst)}</span></div>
           )}
+          {order.pricing.coinsUsed || order.pricing.creditsUsed ? <div><span>Paid via D2C Coins / credits</span><span>{formatINR((order.pricing.coinsUsed || 0) + (order.pricing.creditsUsed || 0))}</span></div> : null}
           <div className="grand"><span>Grand total</span><span>{formatINR(order.pricing.total)}</span></div>
         </div>
         <p className="xs muted mt-16">This is a computer-generated invoice and does not require a signature. Tax rates shown are indicative for this demo.</p>

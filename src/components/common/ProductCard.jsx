@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, Flame, Heart, ShoppingBag, Star, Truck, Zap } from "lucide-react";
+import { Eye, Flame, GitCompareArrows, Heart, ShoppingBag, Star, Truck, Zap } from "lucide-react";
+import { toggleCompare, useCompare } from "../../lib/services/extras";
 import { useShop } from "../../context/ShopContext";
 import { stockOf } from "../../lib/services/inventory";
 import { planFulfilment } from "../../lib/delivery";
@@ -11,6 +12,8 @@ function ProductCardBase({ product, variant, showDelivery = true, rank }) {
   const navigate = useNavigate();
   const { isWishlisted, toggleWishlist, addToCart, openQuickView, inventory, pincode } = useShop();
   const [size, setSize] = useState(null);
+  const compare = useCompare();
+  const inCompare = compare.includes(product.id);
   const stock = stockOf(product.id, inventory).sellable;
   const wished = isWishlisted(product.id);
   const oos = stock <= 0;
@@ -104,6 +107,10 @@ function ProductCardBase({ product, variant, showDelivery = true, rank }) {
         aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
       >
         <Heart size={17} fill={wished ? "currentColor" : "none"} />
+      </button>
+
+      <button type="button" className={cx("pcard-compare", inCompare && "on")} onClick={() => toggleCompare(product)} aria-label="Compare" title={inCompare ? "Remove from compare" : "Add to compare"}>
+        <GitCompareArrows size={14} />
       </button>
 
       <Link to={`/product/${product.id}`} className="pcard-body">

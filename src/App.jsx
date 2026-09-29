@@ -9,6 +9,7 @@ import SandboxGateway from "./components/checkout/SandboxGateway";
 import { PincodeModal } from "./components/common/DeliveryChecker";
 import { Toaster } from "./components/common/ui";
 import HomePage from "./components/home/HomePage";
+import { CompareTray } from "./components/compare/ComparePage";
 import { useLiveSync } from "./lib/services/liveSync";
 import { useCurrentUser } from "./lib/services/account";
 import "./App.css";
@@ -39,6 +40,7 @@ const TrendingPage = lazy(() => import("./components/discovery/TrendingPage"));
 const BrandsPage = lazy(() => import("./components/discovery/BrandsPage"));
 const PulsePage = lazy(() => import("./components/discovery/PulsePage"));
 const NotFoundPage = lazy(() => import("./components/layout/NotFoundPage"));
+const ComparePage = lazy(() => import("./components/compare/ComparePage"));
 const AdminApp = lazy(() => import("./components/admin/AdminApp"));
 const AdminLoginPage = lazy(() => import("./components/admin/AdminLoginPage"));
 
@@ -99,6 +101,7 @@ function Storefront() {
             <Route path="/trending" element={<TrendingPage />} />
             <Route path="/brands/:brandId?" element={<BrandsPage />} />
             <Route path="/pulse" element={<PulsePage />} />
+            <Route path="/compare" element={<ComparePage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
@@ -109,6 +112,7 @@ function Storefront() {
       <ProductQuickView />
       <PincodeModal />
       <SandboxGateway />
+      <CompareTray />
     </>
   );
 }
