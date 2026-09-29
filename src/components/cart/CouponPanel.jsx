@@ -140,12 +140,31 @@ export function PriceDetails({ summary, children, title = "Price details" }) {
           <span>{formatINR(summary.codFee)}</span>
         </div>
       ) : null}
+      {summary.giftWrapFee ? (
+        <div className="pd-row">
+          <span>Gift wrap</span>
+          <span>{formatINR(summary.giftWrapFee)}</span>
+        </div>
+      ) : null}
+      {summary.coinsUsed ? (
+        <div className="pd-row">
+          <span>D2C Coins redeemed</span>
+          <span className="text-green">−{formatINR(summary.coinsUsed)}</span>
+        </div>
+      ) : null}
+      {summary.creditsUsed ? (
+        <div className="pd-row">
+          <span>D2C credits used</span>
+          <span className="text-green">−{formatINR(summary.creditsUsed)}</span>
+        </div>
+      ) : null}
       <hr className="divider" style={{ margin: "4px 0" }} />
       <div className="pd-row total">
         <span>Total amount</span>
         <span>{formatINR(summary.total)}</span>
       </div>
       {summary.savings ? <div className="pd-save">🎉 You're saving {formatINR(summary.savings)} on this order</div> : null}
+      {summary.coinsEarn ? <div className="xs muted center">You'll earn <b className="text-orange">{summary.coinsEarn} D2C Coins</b> when this order is delivered</div> : null}
       {children}
     </div>
   );

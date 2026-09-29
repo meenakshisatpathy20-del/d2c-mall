@@ -37,6 +37,9 @@ import { DeliveryChecker } from "../common/DeliveryChecker";
 import { Breadcrumbs, Empty, Img, Modal, Price, QtyStepper, Rail, RatingChip, SectionHead, useDocumentTitle } from "../common/ui";
 import ShopTheLook from "../social/ShopTheLook";
 import ProductReviews from "./ProductReviews";
+import { BoughtTogether, EmiOffers, ProductQA } from "./ProductExtras";
+import { toggleCompare, togglePriceAlert, toggleStockAlert, useAlerts, useCompare } from "../../lib/services/extras";
+import { Bell, BellRing, GitCompareArrows } from "lucide-react";
 import "./ProductDetailsPage.css";
 
 const SIZE_CHART = {
@@ -135,6 +138,8 @@ export default function ProductDetailsPage() {
   const navigate = useNavigate();
   const product = getProductById(productId);
   const { addToCart, buyNow, toggleWishlist, isWishlisted, addRecentlyViewed, inventory, userOrders, usage, cart } = useShop();
+  const alerts = useAlerts();
+  const compare = useCompare();
   const [size, setSize] = useState(null);
   const [color, setColor] = useState(null);
   const [qty, setQty] = useState(1);
@@ -268,6 +273,7 @@ export default function ProductDetailsPage() {
                 <span className="xs text-green bold">inclusive of all taxes</span>
                 {product.mrp > product.price ? <span className="badge badge-soft-green">You save {formatINR(product.mrp - product.price)}</span> : null}
               </div>
+              <EmiOffers price={product.price} />
               {bestCoupon ? (
                 <div className="best-price">
                   <Tag size={15} />
@@ -318,6 +324,19 @@ export default function ProductDetailsPage() {
                   ))}
                 </div>
                 {sizeError ? <p className="xs text-red bold mt-8">Please select a size to continue</p> : null}
+                {product.soldOutSizes?.length ? (
+                  <div className="row wrap gap-6 mt-8 xs">
+                    <span className="muted">Size sold out? Get notified:</span>
+                    {product.soldOutSizes.map((s) => {
+                      const on = !!alerts.stock?.[`${product.id}__${s}`];
+                      return (
+                        <button key={s} className={cx("chip", on && "active-blue")} style={{ minHeight: 26, padding: "0 10px" }} onClick={() => toggleStockAlert(product.id, s)}>
+                          {on ? <BellRing size={12} /> : <Bell size={12} />} {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
                 {product.sizeChart ? <p className="xs muted mt-8">82% say this fits true to size · model is 5'10" wearing M</p> : null}
               </div>
             ) : null}
@@ -337,14 +356,29 @@ export default function ProductDetailsPage() {
             </div>
 
             <div className="pdp-actions">
-              <button className="btn btn-lg" disabled={stock <= 0} onClick={add}>
-                <ShoppingBag size={19} /> {stock <= 0 ? "Out of stock" : inBag ? "Go to bag" : "Add to bag"}
-              </button>
+              {stock <= 0 ? (
+                <button className={cx("btn btn-lg", alerts.stock?.[`${product.id}__-`] ? "btn-outline-blue" : "btn-dark")} onClick={() => toggleStockAlert(product.id, null)}>
+                  <Bell size={19} /> {alerts.stock?.[`${product.id}__-`] ? "Alert set" : "Notify me"}
+                </button>
+              ) : (
+                <button className="btn btn-lg" onClick={add}>
+                  <ShoppingBag size={19} /> {inBag ? "Go to bag" : "Add to bag"}
+                </button>
+              )}
               <button className="btn btn-lg btn-blue" disabled={stock <= 0} onClick={buy}>
                 <Zap size={19} /> Buy now
               </button>
               <button className={cx("btn btn-lg btn-outline", wished && "text-red")} onClick={() => toggleWishlist(product)}>
                 <Heart size={19} fill={wished ? "currentColor" : "none"} /> {wished ? "Wishlisted" : "Wishlist"}
+              </button>
+            </div>
+
+            <div className="row wrap gap-6">
+              <button className={cx("btn btn-sm", alerts.price?.[product.id] ? "btn-outline-blue" : "btn-ghost")} onClick={() => togglePriceAlert(product)}>
+                {alerts.price?.[product.id] ? <BellRing size={15} /> : <Bell size={15} />} {alerts.price?.[product.id] ? "Price alert on" : "Alert me on price drop"}
+              </button>
+              <button className={cx("btn btn-sm", compare.includes(product.id) ? "btn-outline-blue" : "btn-ghost")} onClick={() => toggleCompare(product)}>
+                <GitCompareArrows size={15} /> {compare.includes(product.id) ? "Added to compare" : "Compare"}
               </button>
             </div>
 
@@ -477,7 +511,11 @@ export default function ProductDetailsPage() {
           </section>
         ) : null}
 
+        <BoughtTogether key={`fbt-${product.id}`} product={product} />
+
         <ProductReviews product={product} />
+
+        <ProductQA product={product} />
 
         <section className="section">
           <SectionHead eyebrow="You may also like" title="Similar products" to={`/category/${product.category}`} action="View all" />

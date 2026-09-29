@@ -641,3 +641,36 @@
 .globe-fallback {
   background: radial-gradient(circle at 50% 50%, rgba(36, 87, 255, 0.35), transparent 60%);
 }
+
+.pcard-compare {
+  position: absolute;
+  top: 52px;
+  right: 10px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink-2);
+  box-shadow: 0 4px 12px -4px rgba(16, 24, 40, 0.25);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.pcard:hover .pcard-compare,
+.pcard-compare.on {
+  opacity: 1;
+}
+
+.pcard-compare.on {
+  background: var(--blue);
+  color: #fff;
+}
+
+@media (hover: none) {
+  .pcard-compare {
+    display: none;
+  }
+}

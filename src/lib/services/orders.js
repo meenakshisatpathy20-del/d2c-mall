@@ -15,7 +15,8 @@ import { formatINR, uid } from "../format";
 import { buildShipment, newInvoiceNo, newOrderId, shipmentStatus } from "../orderModel";
 import { commitReservation, releaseReservation, reserveStock, restock } from "./inventory";
 import { createGatewayOrder, openCheckout, verifyPayment } from "./payments";
-import { notify } from "./account";
+import { notify, updateUser } from "./account";
+import { coinsSummary } from "./extras";
 import { api, live } from "../api";
 
 /** Demo logistics clock: each shipment step advances this fast for new orders. */
@@ -45,7 +46,7 @@ const log = (entry) =>
  * @param {string} p.idempotencyKey
  * @param {(stage:string)=>void} p.onStage
  */
-export async function placeOrder({ user, lines, address, courierChoice = {}, deliverySpeed, paymentMethod, couponCode, idempotencyKey, onStage = () => {} }) {
+export async function placeOrder({ user, lines, address, courierChoice = {}, deliverySpeed, paymentMethod, couponCode, idempotencyKey, extras = {}, onStage = () => {} }) {
   const s = getState();
 
   // 0. Duplicate-order protection
@@ -75,7 +76,12 @@ export async function placeOrder({ user, lines, address, courierChoice = {}, del
 
   // 1. Re-price on "server" (never trust client totals)
   const userOrders = s.orders.filter((o) => o.userId === user.id && !["payment_failed", "pending_payment"].includes(o.status)).length;
-  const summary = computeSummary({ items, couponCode, userOrders, usage: s.couponUsage[user.id] || {}, paymentMethod, deliverySpeed });
+  const freshUser = s.users.find((u) => u.id === user.id) || user;
+  const coinBalance = coinsSummary(freshUser, s.orders).balance;
+  if ((extras.credits || 0) > (freshUser.credits || 0)) return { ok: false, error: "Not enough D2C credits." };
+  if ((extras.coins || 0) > coinBalance) return { ok: false, error: "Not enough D2C Coins." };
+  if (extras.gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(extras.gstin)) return { ok: false, error: "Enter a valid GSTIN for the GST invoice." };
+  const summary = computeSummary({ items, couponCode, userOrders, usage: s.couponUsage[user.id] || {}, paymentMethod, deliverySpeed, giftWrap: extras.giftWrap, credits: extras.credits, coins: extras.coins });
   if (couponCode && !summary.couponCode) return { ok: false, error: summary.couponResult?.reason || "Coupon is no longer valid." };
   if (paymentMethod === "cod" && !summary.codAvailable) return { ok: false, error: "COD is not available for orders above ₹20,000." };
 
@@ -130,6 +136,14 @@ export async function placeOrder({ user, lines, address, courierChoice = {}, del
     timeline: [{ status: "placed", at: Date.now(), note: "Order placed" }],
     invoiceNo: newInvoiceNo(orderId),
     idempotencyKey,
+    extras: {
+      giftWrap: !!extras.giftWrap,
+      giftMessage: extras.giftWrap ? (extras.giftMessage || "").slice(0, 200) : "",
+      gstin: extras.gstin || null,
+      businessName: extras.gstin ? extras.businessName || "" : "",
+      instructions: (extras.instructions || "").slice(0, 200),
+      slot: extras.slot || "Anytime",
+    },
   };
 
   // 3. Reserve stock
@@ -141,6 +155,13 @@ export async function placeOrder({ user, lines, address, courierChoice = {}, del
   }
   setState((st) => ({ ...st, orders: [order, ...st.orders] }));
   patchOrder(orderId, (o) => addTimeline(o, "stock_reserved", "Stock reserved for 15 minutes"));
+
+  if (summary.total === 0) {
+    // Fully paid with D2C credits / coins — no gateway needed
+    patchOrder(orderId, (o) => ({ payment: { ...o.payment, method: "wallet", gateway: "wallet" } }));
+    confirmOrder(orderId, { method: "wallet", instrument: "D2C credits & coins" });
+    return { ok: true, order: getState().orders.find((o) => o.id === orderId) };
+  }
 
   if (paymentMethod === "cod") {
     confirmOrder(orderId, { method: "cod" });
@@ -238,7 +259,7 @@ function confirmOrder(orderId, payment) {
     upi: "UPI",
     card: "Card",
     netbanking: "Net Banking",
-    wallet: "Wallet",
+    wallet: payment.instrument || "Wallet",
     cod: "Cash on Delivery",
   }[payment.method];
 
@@ -278,6 +299,14 @@ function confirmOrder(orderId, payment) {
     };
   });
 
+  if (order.pricing.creditsUsed || order.pricing.coinsUsed) {
+    updateUser(order.userId, (u) => ({
+      credits: Math.max(0, (u.credits || 0) - (order.pricing.creditsUsed || 0)),
+      walletLedger: order.pricing.creditsUsed ? [{ id: `wl-${orderId}`, at: now, type: "debit", amount: order.pricing.creditsUsed, note: `Used on order ${orderId}` }, ...(u.walletLedger || [])] : u.walletLedger,
+      coinsSpent: order.pricing.coinsUsed ? [...(u.coinsSpent || []), { id: `cs-${orderId}`, at: now, amount: order.pricing.coinsUsed, note: `Redeemed on order ${orderId}` }] : u.coinsSpent,
+    }));
+  }
+
   notify(order.userId, {
     type: "order",
     title: "Order confirmed 🎉",
@@ -306,7 +335,7 @@ async function syncOrderToServer(orderId, payment) {
     const r = await api("/orders/confirm", {
       method: "POST",
       body: {
-        order: { ...order, email: order.email, items: order.items.map((i) => ({ lineId: i.lineId, productId: i.productId, qty: i.qty, size: i.size, color: i.color, name: i.name })) },
+        order: { ...order, email: order.email, items: order.items.map((i) => ({ lineId: i.lineId, productId: i.productId, qty: i.qty, size: i.size, color: i.color, name: i.name })), wallet: { credits: order.pricing.creditsUsed || 0, coins: order.pricing.coinsUsed || 0 } },
         payment: isCod ? { method: "cod" } : payment.proof,
       },
     });
@@ -360,6 +389,13 @@ export function cancelOrder(orderId, reason, by = "customer") {
     payment: { ...x.payment, status: paid ? "refund_initiated" : "cancelled", refundAt: paid ? Date.now() : null },
     ...addTimeline(x, "cancelled", `Cancelled (${reason})${paid ? ` — refund of ${formatINR(x.pricing.total)} initiated to original payment method` : ""}`),
   }));
+  if (o.pricing.creditsUsed || o.pricing.coinsUsed) {
+    updateUser(o.userId, (u) => ({
+      credits: (u.credits || 0) + (o.pricing.creditsUsed || 0),
+      walletLedger: o.pricing.creditsUsed ? [{ id: `wr-${orderId}`, at: Date.now(), type: "credit", amount: o.pricing.creditsUsed, note: `Refund for cancelled order ${orderId}` }, ...(u.walletLedger || [])] : u.walletLedger,
+      coinsSpent: (u.coinsSpent || []).filter((c) => c.id !== `cs-${orderId}`),
+    }));
+  }
   notify(o.userId, {
     type: "order",
     title: "Order cancelled",

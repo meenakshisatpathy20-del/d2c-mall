@@ -249,3 +249,21 @@
     font-size: 12px;
   }
 }
+
+.co-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.co-extra {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+}
+
+.text-purple {
+  color: var(--purple);
+}

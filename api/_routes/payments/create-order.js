@@ -6,7 +6,9 @@
  * The Razorpay key secret never leaves the server.
  */
 import { ApiError, handler, readJson, requireEnv, validate } from "../../_lib/http.js";
-import { serverSummary } from "../../_lib/pricing.js";
+import { serverSummary, verifyWallet } from "../../_lib/pricing.js";
+import { verifyJwt } from "../../_lib/auth.js";
+import { db, dbConfigured } from "../../_lib/db.js";
 
 export default handler(
   ["POST"],
@@ -18,7 +20,10 @@ export default handler(
 
     let amount = body.amount;
     if (Array.isArray(body.items)) {
-      const { summary } = serverSummary({ items: body.items, couponCode: body.couponCode, paymentMethod: body.paymentMethod, deliverySpeed: body.deliverySpeed });
+      const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+      const claims = bearer ? verifyJwt(bearer) : null;
+      await verifyWallet({ credits: body.credits, coins: body.coins, claims, db, dbConfigured });
+      const { summary } = serverSummary({ items: body.items, couponCode: body.couponCode, paymentMethod: body.paymentMethod, deliverySpeed: body.deliverySpeed, giftWrap: body.giftWrap, credits: body.credits, coins: body.coins });
       amount = Math.round(summary.total * 100);
       if (body.amount && Math.abs(body.amount - amount) > 100) throw new ApiError(409, "PRICE_CHANGED", "Prices changed — please review your bag", { expected: amount / 100 });
     }

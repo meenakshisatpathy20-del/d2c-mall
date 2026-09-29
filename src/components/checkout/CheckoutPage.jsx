@@ -29,6 +29,10 @@ import { saveAddress, useCurrentUser } from "../../lib/services/account";
 import { planFulfilment } from "../../lib/delivery";
 import { computeSummary } from "../../lib/pricing";
 import { PAYMENT_METHODS, paymentMode } from "../../lib/services/payments";
+import { coinsSummary, isGstin } from "../../lib/services/extras";
+import { live } from "../../lib/api";
+import { useStore } from "../../lib/store";
+import { Coins, FileText, Gift, MessageSquare } from "lucide-react";
 import { collectPayment, placeOrder } from "../../lib/services/orders";
 import { cx, dayLabel, formatINR } from "../../lib/format";
 import { randomId } from "../../lib/crypto";
@@ -80,6 +84,10 @@ export default function CheckoutPage() {
   const [failure, setFailure] = useState(null);
   const idem = useRef(`idem_${randomId(16)}`);
   const [busy, setBusy] = useState(false);
+  const allOrders = useStore((st) => st.orders);
+  const [ex, setEx] = useState({ giftWrap: false, giftMessage: "", gst: Boolean(user?.gstin), gstin: user?.gstin || "", businessName: user?.businessName || "", instructions: "", slot: "Anytime", useCredits: false, useCoins: false });
+  const coinBal = useMemo(() => (user ? coinsSummary(user, allOrders).balance : 0), [user, allOrders]);
+  const walletAllowed = paymentMode() !== "live" || live("db");
 
   const lines = useMemo(() => cart.filter((i) => !i.outOfStock).map((i) => ({ ...i, qty: Math.min(i.qty, i.stock) })), [cart]);
   const address = user?.addresses?.find((a) => a.id === addressId);
@@ -88,8 +96,19 @@ export default function CheckoutPage() {
     [address, lines, inventory]
   );
   const summary = useMemo(
-    () => computeSummary({ items: lines, couponCode: appliedCoupon, userOrders, usage, paymentMethod: method, deliverySpeed: plan?.expressAvailable ? speed : "standard" }),
-    [lines, appliedCoupon, userOrders, usage, method, speed, plan]
+    () =>
+      computeSummary({
+        items: lines,
+        couponCode: appliedCoupon,
+        userOrders,
+        usage,
+        paymentMethod: method,
+        deliverySpeed: plan?.expressAvailable ? speed : "standard",
+        giftWrap: ex.giftWrap,
+        credits: walletAllowed && ex.useCredits ? user?.credits || 0 : 0,
+        coins: walletAllowed && ex.useCoins ? coinBal : 0,
+      }),
+    [lines, appliedCoupon, userOrders, usage, method, speed, plan, ex, user, coinBal, walletAllowed]
   );
   const codDisabledReason = !plan?.codAvailable ? "COD isn't available for this pincode" : !summary.codAvailable ? "COD available on orders up to ₹20,000" : lines.some((l) => !l.product.cod) ? "Some items aren't eligible for COD" : null;
 
@@ -118,6 +137,10 @@ export default function CheckoutPage() {
 
   const pay = async () => {
     if (busy) return;
+    if (ex.gst && !isGstin(ex.gstin)) {
+      toast.error("Enter a valid 15-character GSTIN or untick GST invoice");
+      return;
+    }
     setBusy(true);
     setFailure(null);
     setStage("validating");
@@ -130,6 +153,16 @@ export default function CheckoutPage() {
       paymentMethod: method,
       couponCode: summary.couponCode,
       idempotencyKey: idem.current,
+      extras: {
+        giftWrap: ex.giftWrap,
+        giftMessage: ex.giftMessage,
+        gstin: ex.gst ? ex.gstin.toUpperCase() : null,
+        businessName: ex.businessName,
+        instructions: ex.instructions,
+        slot: ex.slot,
+        credits: summary.creditsUsed,
+        coins: summary.coinsUsed,
+      },
       onStage: setStage,
     });
     setBusy(false);
@@ -388,6 +421,56 @@ export default function CheckoutPage() {
                     </div>
                   ) : null}
 
+                  <div className="co-extras">
+                    {walletAllowed && ((user.credits || 0) > 0 || coinBal > 0) ? (
+                      <div className="co-extra">
+                        <b className="small row gap-6"><Coins size={16} className="text-orange" /> Wallet & rewards</b>
+                        {(user.credits || 0) > 0 ? (
+                          <label className="check small mt-8">
+                            <input type="checkbox" checked={ex.useCredits} onChange={(e) => setEx({ ...ex, useCredits: e.target.checked })} />
+                            Use D2C credits <span className="muted">(balance {formatINR(user.credits)})</span>
+                          </label>
+                        ) : null}
+                        {coinBal > 0 ? (
+                          <label className="check small mt-8">
+                            <input type="checkbox" checked={ex.useCoins} onChange={(e) => setEx({ ...ex, useCoins: e.target.checked })} />
+                            Redeem D2C Coins <span className="muted">({coinBal} coins · up to 30% of items)</span>
+                          </label>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="co-extra">
+                      <label className="check small">
+                        <input type="checkbox" checked={ex.giftWrap} onChange={(e) => setEx({ ...ex, giftWrap: e.target.checked })} />
+                        <Gift size={15} className="text-purple" /> <b>Gift wrap this order</b> <span className="muted">(+₹25 · price hidden on invoice)</span>
+                      </label>
+                      {ex.giftWrap ? <input className="input mt-8" maxLength={200} placeholder="Gift message (optional)" value={ex.giftMessage} onChange={(e) => setEx({ ...ex, giftMessage: e.target.value })} /> : null}
+                    </div>
+                    <div className="co-extra">
+                      <label className="check small">
+                        <input type="checkbox" checked={ex.gst} onChange={(e) => setEx({ ...ex, gst: e.target.checked })} />
+                        <FileText size={15} className="text-blue" /> <b>Use GST invoice</b> <span className="muted">(claim input tax credit for business)</span>
+                      </label>
+                      {ex.gst ? (
+                        <div className="form-grid mt-8">
+                          <input className={cx("input", ex.gstin && !isGstin(ex.gstin) && "invalid")} placeholder="GSTIN (e.g. 29ABCDE1234F1Z5)" maxLength={15} value={ex.gstin} onChange={(e) => setEx({ ...ex, gstin: e.target.value.toUpperCase() })} />
+                          <input className="input" placeholder="Registered business name" value={ex.businessName} onChange={(e) => setEx({ ...ex, businessName: e.target.value })} />
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="co-extra">
+                      <b className="small row gap-6"><MessageSquare size={15} className="text-blue" /> Delivery preferences</b>
+                      <div className="form-grid mt-8">
+                        <select className="select" value={ex.slot} onChange={(e) => setEx({ ...ex, slot: e.target.value })}>
+                          {["Anytime", "Morning (9 AM – 12 PM)", "Afternoon (12 PM – 4 PM)", "Evening (4 PM – 8 PM)", "Weekend only"].map((x) => (
+                            <option key={x}>{x}</option>
+                          ))}
+                        </select>
+                        <input className="input" maxLength={200} placeholder="Instructions for delivery partner (optional)" value={ex.instructions} onChange={(e) => setEx({ ...ex, instructions: e.target.value })} />
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="pay-methods">
                     {PAYMENT_METHODS.map((m) => {
                       const Icon = METHOD_ICONS[m.id];
@@ -419,7 +502,7 @@ export default function CheckoutPage() {
                   </div>
 
                   <button className="btn btn-lg btn-block mt-16" onClick={pay} disabled={busy || !plan?.ok}>
-                    <Lock size={17} /> {method === "cod" ? `Place order · ${formatINR(summary.total)}` : `Pay ${formatINR(summary.total)} securely`}
+                    <Lock size={17} /> {summary.total === 0 ? "Place order · paid with wallet" : method === "cod" ? `Place order · ${formatINR(summary.total)}` : `Pay ${formatINR(summary.total)} securely`}
                   </button>
                   <p className="xs muted center mt-8">
                     By placing this order you agree to D2C Mall's terms. Payments are processed by Razorpay and verified on our server.

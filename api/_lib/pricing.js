@@ -20,9 +20,21 @@ export function repriceItems(rawItems = []) {
   });
 }
 
-export function serverSummary({ items, couponCode, paymentMethod, deliverySpeed, userOrders = 0, usage = {} }) {
+export function serverSummary({ items, couponCode, paymentMethod, deliverySpeed, userOrders = 0, usage = {}, giftWrap = false, credits = 0, coins = 0 }) {
   const priced = repriceItems(items);
-  const summary = computeSummary({ items: priced, couponCode, paymentMethod, deliverySpeed, userOrders, usage });
+  const summary = computeSummary({ items: priced, couponCode, paymentMethod, deliverySpeed, userOrders, usage, giftWrap, credits, coins });
   if (couponCode && !summary.couponCode) throw new ApiError(422, "COUPON_INVALID", summary.couponResult?.reason || "Coupon not applicable");
   return { items: priced, summary };
+}
+
+/**
+ * Wallet (D2C credits / coins) can only reduce the amount when the server can
+ * verify the balance: requires the database and a logged-in customer.
+ */
+export async function verifyWallet({ credits = 0, coins = 0, claims, db, dbConfigured }) {
+  if (!credits && !coins) return;
+  if (!dbConfigured() || !claims) throw new ApiError(422, "WALLET_UNAVAILABLE", "D2C credits/coins need a logged-in account on the live server");
+  const u = await db.get(`user:${claims.email}`);
+  if (!u || (u.credits || 0) < credits || (u.coins || 0) < coins) throw new ApiError(422, "INSUFFICIENT_WALLET", "Not enough D2C credits or coins");
+  return u;
 }

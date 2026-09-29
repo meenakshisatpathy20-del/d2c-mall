@@ -10,6 +10,9 @@ export const STANDARD_SHIPPING = 49;
 export const EXPRESS_SHIPPING = 99;
 export const COD_FEE = 29;
 export const COD_LIMIT = 20000;
+export const GIFT_WRAP_FEE = 25;
+/** D2C Coins can cover at most this share of the item total (like Flipkart SuperCoins). */
+export const COINS_MAX_SHARE = 0.3;
 
 export function lineTotals(items) {
   const itemTotal = items.reduce((t, i) => t + i.price * i.qty, 0);
@@ -69,6 +72,9 @@ export function computeSummary({
   usage = {},
   paymentMethod,
   deliverySpeed = "standard",
+  giftWrap = false,
+  credits = 0,
+  coins = 0,
 }) {
   const { itemTotal, mrpTotal, productDiscount } = lineTotals(items);
   let couponDiscount = 0;
@@ -88,8 +94,12 @@ export function computeSummary({
   let shipping = items.length ? (freeShipping ? 0 : STANDARD_SHIPPING) : 0;
   if (deliverySpeed === "express" && items.length) shipping += EXPRESS_SHIPPING;
   const codFee = paymentMethod === "cod" ? COD_FEE : 0;
-  const total = Math.max(afterDiscount + shipping + codFee, 0);
-  const savings = productDiscount + couponDiscount + (freeShipping ? STANDARD_SHIPPING : 0);
+  const giftWrapFee = giftWrap && items.length ? GIFT_WRAP_FEE : 0;
+  const payable = Math.max(afterDiscount + shipping + codFee + giftWrapFee, 0);
+  const coinsUsed = Math.max(0, Math.min(Math.floor(coins) || 0, Math.floor(itemTotal * COINS_MAX_SHARE), payable));
+  const creditsUsed = Math.max(0, Math.min(Math.floor(credits) || 0, payable - coinsUsed));
+  const total = payable - coinsUsed - creditsUsed;
+  const savings = productDiscount + couponDiscount + (freeShipping ? STANDARD_SHIPPING : 0) + coinsUsed;
 
   return {
     itemCount: items.reduce((t, i) => t + i.qty, 0),
@@ -103,6 +113,10 @@ export function computeSummary({
     freeShipping,
     amountForFreeShipping: freeShipping ? 0 : Math.max(FREE_SHIPPING_THRESHOLD - afterDiscount, 0),
     codFee,
+    giftWrapFee,
+    coinsUsed,
+    creditsUsed,
+    coinsEarn: Math.floor(total * 0.02),
     codAvailable: total <= COD_LIMIT,
     total,
     savings,

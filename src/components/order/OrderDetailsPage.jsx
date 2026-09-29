@@ -254,6 +254,18 @@ export default function OrderDetailsPage() {
               {order.payment.status === "refund_initiated" ? <div className="notice info mt-12">Refund of {formatINR(order.pricing.total)} initiated on {formatDate(order.payment.refundAt)}. Expected in 3–5 working days.</div> : null}
             </div>
 
+            {order.extras && (order.extras.giftWrap || order.extras.gstin || order.extras.instructions || (order.extras.slot && order.extras.slot !== "Anytime")) ? (
+              <div className="card card-pad">
+                <b className="small">Order preferences</b>
+                <div className="od-pay mt-12">
+                  {order.extras.slot ? <div><span>Delivery slot</span><b className="xs">{order.extras.slot}</b></div> : null}
+                  {order.extras.giftWrap ? <div><span>Gift wrap</span><b className="xs">Yes{order.extras.giftMessage ? ` · “${order.extras.giftMessage}”` : ""}</b></div> : null}
+                  {order.extras.gstin ? <div><span>GST invoice</span><b className="xs">{order.extras.businessName} · {order.extras.gstin}</b></div> : null}
+                  {order.extras.instructions ? <div><span>Instructions</span><b className="xs">{order.extras.instructions}</b></div> : null}
+                </div>
+              </div>
+            ) : null}
+
             <div className="card card-pad price-details">
               <b className="small">Price breakdown</b>
               <div className="pd-row"><span>Item total (MRP)</span><span>{formatINR(order.pricing.mrpTotal)}</span></div>
@@ -261,6 +273,9 @@ export default function OrderDetailsPage() {
               {order.pricing.couponDiscount ? <div className="pd-row"><span>Coupon {order.pricing.couponCode}</span><span className="text-green">−{formatINR(order.pricing.couponDiscount)}</span></div> : null}
               <div className="pd-row"><span>Delivery</span><span>{order.pricing.shipping ? formatINR(order.pricing.shipping) : "FREE"}</span></div>
               {order.pricing.codFee ? <div className="pd-row"><span>COD fee</span><span>{formatINR(order.pricing.codFee)}</span></div> : null}
+              {order.pricing.giftWrapFee ? <div className="pd-row"><span>Gift wrap</span><span>{formatINR(order.pricing.giftWrapFee)}</span></div> : null}
+              {order.pricing.coinsUsed ? <div className="pd-row"><span>D2C Coins used</span><span className="text-green">−{formatINR(order.pricing.coinsUsed)}</span></div> : null}
+              {order.pricing.creditsUsed ? <div className="pd-row"><span>D2C credits used</span><span className="text-green">−{formatINR(order.pricing.creditsUsed)}</span></div> : null}
               <div className="pd-row total"><span>Order total</span><span>{formatINR(order.pricing.total)}</span></div>
             </div>
 

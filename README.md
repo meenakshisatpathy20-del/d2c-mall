@@ -72,6 +72,13 @@ Admin console: **`/admin`** (login at `/admin/login`). Franchise status demo:
    - For live shipping: `SHIPROCKET_EMAIL`, `SHIPROCKET_PASSWORD` (a Shiprocket API user),
      `SHIPROCKET_WEBHOOK_TOKEN` and your pickup location names.
    - Always set `JWT_SECRET` and `ALLOWED_ORIGINS`.
+   - Database: add **Upstash for Redis** from Vercel → Storage (or set `UPSTASH_REDIS_REST_URL` /
+     `UPSTASH_REDIS_REST_TOKEN`). Enables server accounts, order history, wallet (credits/coins).
+   - OTP login by SMS: `MSG91_AUTH_KEY` + `MSG91_OTP_TEMPLATE_ID`. Email: `RESEND_API_KEY`.
+     WhatsApp: `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID`. Set `PUBLIC_URL` for links in messages.
+   - Each feature switches from demo to live **automatically** once its variables exist —
+     the storefront reads `/api/health` and the admin dashboard's *System status* panel shows
+     which integrations are live.
 3. Deploy. `vercel.json` handles SPA routing (`/orders/…` etc.) and security headers;
    files in `/api` become serverless functions automatically.
 4. Webhooks:

@@ -467,3 +467,32 @@
     display: none;
   }
 }
+
+/* ---------- Coupons, coins, gift cards, refer & earn, PAN/GST ---------- */
+.acx-coupons { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.acx-coupon { display: flex; border: 1.5px dashed #c9d3ff; border-radius: 14px; overflow: hidden; background: #fff; }
+.acx-coupon.is-off { opacity: 0.55; filter: grayscale(0.6); }
+.acx-coupon-l { flex: none; width: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 12px 6px; color: #fff; background: linear-gradient(160deg, #2457ff, #493cff); }
+.acx-coupon-l b { font-size: 20px; line-height: 1.1; }
+.acx-coupon-r { flex: 1; min-width: 0; padding: 12px 14px; }
+.acx-coupon-r p { margin: 4px 0 0; }
+.acx-state { flex: none; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; background: #eef1f6; color: #5b667a; }
+.acx-state.on { background: #e5f9f0; color: #0f9d65; }
+.acx-rating { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 6px; background: #12b76a; color: #fff; font-size: 12px; font-weight: 700; }
+.acx-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+.acx-ledger { padding: 10px 0; border-bottom: 1px solid var(--line, #e8ecf3); gap: 12px; }
+.acx-ledger:last-child { border-bottom: 0; }
+.acx-coins-card { background: linear-gradient(135deg, #ff6b00, #ed6200 55%, #c24d00); }
+.acx-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.acx-step-n { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-bottom: 6px; border-radius: 50%; background: #eef2ff; color: #2457ff; font-weight: 800; font-size: 13px; }
+.acx-refer { position: relative; display: flex; justify-content: space-between; gap: 16px; padding: 26px; border-radius: 20px; overflow: hidden; color: #fff; background: radial-gradient(circle at 85% 20%, rgba(255, 107, 0, 0.35), transparent 45%), linear-gradient(135deg, #07132f, #1a2a6b); }
+.acx-refer h2 { margin: 6px 0; font-size: 28px; color: #fff; }
+.acx-refer p { color: #cbd5ea; max-width: 460px; }
+.acx-refer-ic { flex: none; color: rgba(255, 255, 255, 0.18); }
+.acx-refcode { display: inline-flex; align-items: center; gap: 14px; margin-top: 14px; padding: 8px 8px 8px 16px; border: 1.5px dashed rgba(255, 255, 255, 0.4); border-radius: 12px; }
+.acx-refcode b { font-size: 20px; letter-spacing: 2px; }
+@media (max-width: 720px) {
+  .acx-form, .acx-steps { grid-template-columns: 1fr; }
+  .acx-coupons { grid-template-columns: 1fr; }
+  .acx-refer-ic { display: none; }
+}
