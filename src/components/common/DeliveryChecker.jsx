@@ -6,6 +6,7 @@ import { planFulfilment } from "../../lib/delivery";
 import { dayLabel } from "../../lib/format";
 import { useCurrentUser } from "../../lib/services/account";
 import { Modal } from "./ui";
+import { api, live, useBackend } from "../../lib/api";
 
 /** Pincode-based serviceability + ETA + confidence for one product (PDP / Quick view). */
 export function DeliveryChecker({ product, compact }) {
@@ -34,6 +35,19 @@ export function DeliveryChecker({ product, compact }) {
   };
 
   const ship = plan?.ok ? plan.shipments[0] : null;
+  const backend = useBackend();
+  const [liveCouriers, setLiveCouriers] = useState(null);
+  useEffect(() => {
+    setLiveCouriers(null);
+    if (!ship || !backend.available || !live("shiprocket")) return;
+    let alive = true;
+    api(`/shiprocket/serviceability?pickup=${ship.warehouse.pincode}&delivery=${pincode.pincode}&weight=${product.weightKg || 0.5}&cod=1`)
+      .then((d) => alive && setLiveCouriers(d))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [ship, pincode, product, backend]);
 
   return (
     <div className="dcheck">
@@ -99,6 +113,17 @@ export function DeliveryChecker({ product, compact }) {
                   <div className="xs muted">Based on stock, courier SLA & distance for {plan.location.city}</div>
                 </div>
               </div>
+              {liveCouriers?.couriers?.length ? (
+                <div className="soft-panel xs">
+                  <b className="row gap-6"><span className="live-dot" /> Live courier options (Shiprocket)</b>
+                  {liveCouriers.couriers.slice(0, 3).map((c) => (
+                    <div key={c.id} className="row between mt-4">
+                      <span>{c.name}{c.cod ? " · COD" : ""}</span>
+                      <span className="muted">{c.etd || `${c.days} days`}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {ship ? (
                 <div className="wh-route">
                   <Warehouse size={14} />

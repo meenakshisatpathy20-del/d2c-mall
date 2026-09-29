@@ -3,6 +3,7 @@
  * AWB number. Polls every 4s (roadmap: polling → webhooks/SSE later).
  */
 import { useState } from "react";
+import { live } from "../../lib/api";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MapPin, Package, Phone, Search, Truck, Warehouse } from "lucide-react";
@@ -12,7 +13,7 @@ import { SHIPMENT_LABEL, flowIndex, shipmentEta, shipmentStatus } from "../../li
 import { useNow } from "../../lib/services/liveSync";
 import { dayLabel, formatTime } from "../../lib/format";
 import { Breadcrumbs, Empty, useDocumentTitle } from "../common/ui";
-import { ShipmentEvents, ShipmentProgress } from "./OrderBits";
+import { ShipmentEvents, ShipmentProgress, useLiveTracking } from "./OrderBits";
 import "./ShipmentTrackingPage.css";
 
 export default function ShipmentTrackingPage() {
@@ -33,6 +34,9 @@ export default function ShipmentTrackingPage() {
       }
     }
   }
+
+  const awbOnly = shipmentId && !found ? shipmentId : null;
+  const liveAwb = useLiveTracking(awbOnly, !!awbOnly && live("shiprocket"));
 
   const search = (e) => {
     e.preventDefault();
@@ -62,7 +66,26 @@ export default function ShipmentTrackingPage() {
           </form>
         </div>
 
-        {shipmentId && !found ? (
+        {liveAwb ? (
+          <div className="card card-pad mt-24">
+            <span className="xs muted">AWB {liveAwb.awb} · {liveAwb.courier}</span>
+            <h2 className="track-status">{liveAwb.rawStatus}</h2>
+            {liveAwb.etd ? <p className="small">Expected by <b className="text-green">{liveAwb.etd}</b></p> : null}
+            <div className="timeline mt-16">
+              {liveAwb.events.map((e, i) => (
+                <div key={i} className={`tl-item ${i === 0 ? "current" : "done"}`}>
+                  <span className="tl-dot" />
+                  <div>
+                    <div className="tl-title">{e.note}</div>
+                    <div className="tl-meta">{e.location} · {e.at}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {shipmentId && !found && !liveAwb ? (
           <Empty icon={<Package size={34} />} title="No shipment found" text={`We couldn't find "${shipmentId}". Check the AWB number from your SMS/email or open the order from My Orders.`} action={<Link to="/orders" className="btn">My orders</Link>} />
         ) : null}
 

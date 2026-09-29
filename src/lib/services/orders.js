@@ -16,6 +16,7 @@ import { buildShipment, newInvoiceNo, newOrderId, shipmentStatus } from "../orde
 import { commitReservation, releaseReservation, reserveStock, restock } from "./inventory";
 import { createGatewayOrder, openCheckout, verifyPayment } from "./payments";
 import { notify } from "./account";
+import { api, live } from "../api";
 
 /** Demo logistics clock: each shipment step advances this fast for new orders. */
 export const DEMO_STEP_MS = 3 * 60 * 1000;
@@ -166,7 +167,7 @@ export async function collectPayment(orderId, { user, address, paymentMethod, on
   onStage("creating_payment");
   let gatewayOrder;
   try {
-    gatewayOrder = await createGatewayOrder({ orderId, amount: order.pricing.total, customer: user.email });
+    gatewayOrder = await createGatewayOrder({ orderId, amount: order.pricing.total, customer: user.email, order });
   } catch (e) {
     releaseReservation(orderId, "release");
     failOrder(orderId, e.message || "Could not create payment order");
@@ -199,6 +200,7 @@ export async function collectPayment(orderId, { user, address, paymentMethod, on
   log({ orderId, event: "payment_verified", ref: result.razorpay_payment_id, amount: order.pricing.total });
   onStage("confirming");
   confirmOrder(orderId, {
+    proof: gatewayOrder.sandbox ? null : result,
     method: paymentMethod,
     razorpayPaymentId: result.razorpay_payment_id,
     razorpayOrderId: result.razorpay_order_id,
@@ -285,7 +287,45 @@ function confirmOrder(orderId, payment) {
   });
   if (payment.method !== "cod")
     notify(order.userId, { type: "payment", title: "Payment received", body: `${formatINR(order.pricing.total)} paid via ${instrumentLabel} for order ${orderId}.`, link: `/orders/${orderId}`, channels: ["email", "sms"] });
+
+  syncOrderToServer(orderId, payment);
 }
+
+/**
+ * Server confirmation (runs when the API is configured): verifies payment on the
+ * server, re-prices, persists, creates real Shiprocket shipments and sends
+ * email/SMS/WhatsApp. Live AWBs replace the local ones so tracking uses Shiprocket.
+ */
+async function syncOrderToServer(orderId, payment) {
+  const needServer = live("db") || live("shiprocket") || live("notifications");
+  const isCod = payment.method === "cod";
+  const s = getState();
+  if (!needServer || (!isCod && !payment.proof) || (isCod && !s.session?.serverToken)) return;
+  const order = s.orders.find((o) => o.id === orderId);
+  try {
+    const r = await api("/orders/confirm", {
+      method: "POST",
+      body: {
+        order: { ...order, email: order.email, items: order.items.map((i) => ({ lineId: i.lineId, productId: i.productId, qty: i.qty, size: i.size, color: i.color, name: i.name })) },
+        payment: isCod ? { method: "cod" } : payment.proof,
+      },
+    });
+    patchOrder(orderId, (o) => ({
+      serverSynced: true,
+      shipments: o.shipments.map((sh) => {
+        const liveShip = r.shipments?.find((x) => x.warehouseId === sh.warehouseId && x.awb);
+        return liveShip ? { ...sh, awb: liveShip.awb, liveCourier: liveShip.courier, trackingUrl: liveShip.trackingUrl, provider: "shiprocket-live" } : sh;
+      }),
+      timeline: [
+        ...o.timeline,
+        { status: "server", at: Date.now(), note: `Confirmed on server${r.persisted ? " & saved" : ""}${r.shipments?.some((x) => x.awb) ? " · Shiprocket AWB generated" : ""}` },
+      ],
+    }));
+  } catch (e) {
+    patchOrder(orderId, (o) => ({ timeline: [...o.timeline, { status: "server_error", at: Date.now(), note: `Server sync pending: ${e.message}` }] }));
+  }
+}
+
 
 /** Called when the customer leaves checkout mid-payment. */
 export function abandonPayment(orderId) {

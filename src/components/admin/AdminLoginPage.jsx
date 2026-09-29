@@ -28,7 +28,7 @@ export default function AdminLoginPage() {
     if (!email || !password) return setError("Enter your admin ID and password.");
     setLoading(true);
     await new Promise((r) => setTimeout(r, 400));
-    const r = adminLogin(email, password);
+    const r = await adminLogin(email, password);
     setLoading(false);
     if (!r.ok) return setError(r.error);
     navigate(params.get("next") || "/admin", { replace: true });

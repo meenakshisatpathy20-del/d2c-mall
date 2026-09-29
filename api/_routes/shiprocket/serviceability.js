@@ -2,8 +2,8 @@
  * GET /api/shiprocket/serviceability?pickup=421302&delivery=831001&weight=0.5&cod=1
  * Returns available couriers with ETA, rate and COD support.
  */
-import { handler, validate } from "../_lib/http.js";
-import { sr } from "../_lib/shiprocket.js";
+import { handler, validate } from "../../_lib/http.js";
+import { sr } from "../../_lib/shiprocket.js";
 
 export default handler(
   ["GET"],

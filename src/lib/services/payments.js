@@ -26,12 +26,22 @@ export const PAYMENT_METHODS = [
 
 /* ---------- gateway order ---------- */
 
-export async function createGatewayOrder({ orderId, amount, customer }) {
+export async function createGatewayOrder({ orderId, amount, customer, order }) {
   if (KEY_ID) {
     const res = await fetch(`${API}/payments/create-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ receipt: orderId, amount: Math.round(amount * 100), currency: "INR", notes: { orderId, customer } }),
+      body: JSON.stringify({
+        receipt: orderId,
+        amount: Math.round(amount * 100),
+        currency: "INR",
+        notes: { orderId, customer },
+        // server re-prices from the catalogue and rejects tampered totals
+        items: order?.items?.map((i) => ({ productId: i.productId, qty: i.qty, size: i.size, color: i.color })),
+        couponCode: order?.pricing?.couponCode || null,
+        paymentMethod: order?.payment?.method,
+        deliverySpeed: order?.deliverySpeed,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error?.message || "Could not start payment");
