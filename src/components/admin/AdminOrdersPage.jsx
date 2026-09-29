@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api, live, useBackend } from "../../lib/api";
 import { useSearchParams } from "react-router-dom";
 import { Download, FastForward, Pause, Search, Truck, X, XCircle, AlertTriangle, RefreshCcw } from "lucide-react";
 import { useStore } from "../../lib/store";
@@ -148,7 +149,17 @@ export default function AdminOrdersPage({ admin }) {
   const [wh, setWh] = useState(admin.warehouseId || "all");
   const [openId, setOpenId] = useState(params.get("q") || null);
 
-  const orders = useMemo(() => scopeOrders(all, admin).map((o) => ({ ...o, live: deriveOrderStatus(o, now) })), [all, admin, now]);
+  const backend = useBackend();
+  const serverToken = useStore((s) => s.adminSession?.serverToken);
+  const [serverOrders, setServerOrders] = useState([]);
+  useEffect(() => {
+    if (!backend.available || !live("db") || !serverToken) return;
+    api("/admin/orders?limit=100")
+      .then((r) => setServerOrders((r.orders || []).map((o) => ({ ...o, fromServer: true, shipments: o.shipments || [], timeline: o.timeline || [], customer: o.customer || o.address?.name || "Customer" }))))
+      .catch(() => {});
+  }, [backend, serverToken]);
+  const merged = useMemo(() => [...serverOrders.filter((so) => !all.some((o) => o.id === so.id)), ...all], [serverOrders, all]);
+  const orders = useMemo(() => scopeOrders(merged, admin).map((o) => ({ ...o, live: deriveOrderStatus(o, now) })), [merged, admin, now]);
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
     return orders.filter((o) => {
@@ -221,7 +232,7 @@ export default function AdminOrdersPage({ admin }) {
             {list.map((o) => (
               <tr key={o.id} className={cx("clickable", openId === o.id && "selected")} onClick={() => setOpenId(o.id)}>
                 <td>
-                  <b className="small text-blue">{o.id}</b>
+                  <b className="small text-blue">{o.id}</b> {o.fromServer || o.serverSynced ? <span className="badge badge-soft-green">Server</span> : null}
                   <div className="xs muted">{formatDateTime(o.createdAt)}</div>
                 </td>
                 <td className="small">

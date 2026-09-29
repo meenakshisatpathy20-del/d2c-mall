@@ -5,6 +5,7 @@
 import { getState, setState, useStore } from "../store";
 import { hashPassword, randomId } from "../crypto";
 import { uid } from "../format";
+import { api, live } from "../api";
 
 const SESSION_TTL = 7 * 86400000;
 const ADMIN_TTL = 8 * 3600000;
@@ -42,7 +43,7 @@ function fail(key) {
 
 /* ---------- customer auth ---------- */
 
-export function register({ name, email, phone, password }) {
+function registerLocal({ name, email, phone, password }) {
   const s = getState();
   email = email.trim().toLowerCase();
   if (!name?.trim()) return { ok: false, error: "Please enter your name." };
@@ -74,7 +75,7 @@ export function register({ name, email, phone, password }) {
   return { ok: true, user };
 }
 
-export function login(email, password) {
+function loginLocal(email, password) {
   const key = `c:${String(email).toLowerCase()}`;
   const wait = throttled(key);
   if (wait) return { ok: false, error: `Too many attempts. Try again in ${wait} min.` };
@@ -89,14 +90,14 @@ export function login(email, password) {
 }
 
 /** OTP login (demo: OTP is shown on screen; real SMS via /api/notify) */
-export function requestOtp(phone) {
+function requestOtpLocal(phone) {
   if (!isPhone(phone)) return { ok: false, error: "Enter a valid 10-digit mobile number." };
   const otp = String(Math.floor(100000 + Math.random() * 900000));
   sessionStorage.setItem("d2c_otp", JSON.stringify({ phone, otp, exp: Date.now() + 5 * 60000 }));
   return { ok: true, otp };
 }
 
-export function verifyOtp(phone, otp) {
+function verifyOtpLocal(phone, otp) {
   try {
     const saved = JSON.parse(sessionStorage.getItem("d2c_otp") || "{}");
     if (saved.phone !== phone || saved.otp !== otp || saved.exp < Date.now()) return { ok: false, error: "Invalid or expired OTP." };
@@ -109,11 +110,11 @@ export function verifyOtp(phone, otp) {
   return { ok: true, user };
 }
 
-function startSession(userId) {
+function startSession(userId, serverToken) {
   const token = randomId(32);
   setState((st) => ({
     ...st,
-    session: { userId, token, expiresAt: Date.now() + SESSION_TTL },
+    session: { userId, token, serverToken: serverToken || null, expiresAt: Date.now() + SESSION_TTL },
     users: st.users.map((u) =>
       u.id === userId
         ? {
@@ -127,6 +128,94 @@ function startSession(userId) {
         : u
     ),
   }));
+}
+
+/* ---------- server-backed auth (used automatically when the API + DB are configured) ---------- */
+
+function mirrorServerUser(u, serverToken) {
+  setState((st) => {
+    const existing = st.users.find((x) => x.id === u.id || x.email === u.email);
+    const mirror = {
+      ...(existing || { savedUpi: [], savedCards: [], sessions: [], tier: "Member", status: "active" }),
+      ...u,
+      server: true,
+      addresses: u.addresses?.length ? u.addresses : existing?.addresses || [],
+    };
+    return { ...st, users: existing ? st.users.map((x) => (x === existing ? mirror : x)) : [...st.users, mirror] };
+  });
+  startSession(u.id, serverToken);
+  return getState().users.find((x) => x.id === u.id);
+}
+
+const errMsg = (e) => ({ ok: false, error: e.message || "Something went wrong" });
+
+export async function register(form) {
+  if (live("db") && live("jwt")) {
+    const local = { ...form, email: String(form.email).trim().toLowerCase() };
+    if (!local.name?.trim()) return { ok: false, error: "Please enter your name." };
+    if (!isEmail(local.email)) return { ok: false, error: "Enter a valid email address." };
+    if (!isPhone(local.phone)) return { ok: false, error: "Enter a valid 10-digit mobile number." };
+    if (passwordIssues(local.password).length) return { ok: false, error: "Password doesn't meet the requirements." };
+    try {
+      const r = await api("/auth/register", { method: "POST", body: local });
+      const user = mirrorServerUser(r.user, r.token);
+      notify(user.id, { type: "account", title: `Welcome to D2C Mall, ${user.name.split(" ")[0]}! 🎉`, body: "₹100 D2C credits added. Use WELCOME100 for ₹100 off your first order.", link: "/shop" });
+      return { ok: true, user, server: true };
+    } catch (e) {
+      return errMsg(e);
+    }
+  }
+  return registerLocal(form);
+}
+
+export async function login(email, password) {
+  if (live("db") && live("jwt")) {
+    try {
+      const r = await api("/auth/login", { method: "POST", body: { email, password } });
+      return { ok: true, user: mirrorServerUser(r.user, r.token), server: true };
+    } catch (e) {
+      // Demo accounts still work when the server doesn't know them
+      if (e.status === 401 && getState().users.some((u) => u.email === String(email).toLowerCase() && !u.server)) return loginLocal(email, password);
+      return errMsg(e);
+    }
+  }
+  return loginLocal(email, password);
+}
+
+export async function requestOtp(phone) {
+  if (live("db") && live("sms")) {
+    if (!isPhone(phone)) return { ok: false, error: "Enter a valid 10-digit mobile number." };
+    try {
+      await api("/auth/otp-send", { method: "POST", body: { phone } });
+      return { ok: true, server: true };
+    } catch (e) {
+      return { ...errMsg(e), needsSignup: e.code === "NOT_REGISTERED" };
+    }
+  }
+  return requestOtpLocal(phone);
+}
+
+export async function verifyOtp(phone, otp) {
+  if (live("db") && live("sms")) {
+    try {
+      const r = await api("/auth/otp-verify", { method: "POST", body: { phone, otp } });
+      return { ok: true, user: mirrorServerUser(r.user, r.token), server: true };
+    } catch (e) {
+      return errMsg(e);
+    }
+  }
+  return verifyOtpLocal(phone, otp);
+}
+
+let profileTimer = null;
+function syncProfileToServer(userId) {
+  const s = getState();
+  const u = s.users.find((x) => x.id === userId);
+  if (!u?.server || !s.session?.serverToken || s.session.userId !== userId) return;
+  clearTimeout(profileTimer);
+  profileTimer = setTimeout(() => {
+    api("/auth/profile", { method: "POST", body: { name: u.name, gender: u.gender, dob: u.dob, addresses: u.addresses, prefs: u.prefs } }).catch(() => {});
+  }, 600);
 }
 
 export function logout() {
@@ -154,6 +243,7 @@ export function updateUser(userId, patch) {
     ...st,
     users: st.users.map((u) => (u.id === userId ? { ...u, ...(typeof patch === "function" ? patch(u) : patch) } : u)),
   }));
+  syncProfileToServer(userId);
 }
 
 export function changePassword(userId, current, next) {
@@ -235,7 +325,7 @@ export const ROLES = {
   logistics: { label: "Logistics", color: "#7f56d9", can: ["dashboard", "orders", "shipments", "warehouses", "returns"] },
 };
 
-export function adminLogin(email, password) {
+function adminLoginLocal(email, password) {
   const key = `a:${String(email).toLowerCase()}`;
   const wait = throttled(key);
   if (wait) return { ok: false, error: `Account temporarily locked. Try again in ${wait} min.` };
@@ -246,6 +336,26 @@ export function adminLogin(email, password) {
   }
   setState((st) => ({ ...st, adminSession: { adminId: admin.id, role: admin.role, token: randomId(32), expiresAt: Date.now() + ADMIN_TTL, at: Date.now() } }));
   return { ok: true, admin };
+}
+
+export async function adminLogin(email, password) {
+  if (live("adminUsers") && live("jwt")) {
+    try {
+      const r = await api("/admin/login", { method: "POST", body: { email, password } });
+      const a = r.admin;
+      const id = `srv-${a.email}`;
+      setState((st) => ({
+        ...st,
+        admins: st.admins.some((x) => x.id === id) ? st.admins : [...st.admins, { id, name: a.name, email: a.email, role: a.role, warehouseId: a.warehouseId, server: true }],
+        adminSession: { adminId: id, role: a.role, token: randomId(32), serverToken: r.token, expiresAt: Date.now() + ADMIN_TTL, at: Date.now() },
+      }));
+      return { ok: true, admin: a, server: true };
+    } catch (e) {
+      if (e.status === 401 && getState().admins.some((x) => x.email === String(email).toLowerCase() && !x.server)) return adminLoginLocal(email, password);
+      return errMsg(e);
+    }
+  }
+  return adminLoginLocal(email, password);
 }
 
 export function adminLogout() {

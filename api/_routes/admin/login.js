@@ -5,8 +5,8 @@
  *   node -e "import('./api/_lib/auth.js').then(m=>console.log(m.hashPassword('YourPass@123')))"
  * ADMIN_USERS='[{"email":"ops@d2cmall.in","name":"Ops","role":"super_admin","warehouseId":null,"hash":"scrypt$..."}]'
  */
-import { ApiError, handler, readJson, validate } from "../_lib/http.js";
-import { signJwt, verifyPassword } from "../_lib/auth.js";
+import { ApiError, handler, readJson, validate } from "../../_lib/http.js";
+import { signJwt, verifyPassword } from "../../_lib/auth.js";
 
 export default handler(
   ["POST"],

@@ -2,8 +2,8 @@
  * GET /api/shiprocket/track?awb=XXXXXXXX
  * Customer-facing tracking timeline (polled by the tracking page).
  */
-import { ApiError, handler } from "../_lib/http.js";
-import { mapStatus, sr } from "../_lib/shiprocket.js";
+import { ApiError, handler } from "../../_lib/http.js";
+import { mapStatus, sr } from "../../_lib/shiprocket.js";
 
 export default handler(
   ["GET"],

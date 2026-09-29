@@ -38,31 +38,35 @@ export default function LoginPage() {
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 350));
-    setLoading(false);
+    await new Promise((r) => setTimeout(r, 250));
+    try {
     if (mode === "signup") {
-      const r = register(form);
+      const r = await register(form);
       if (!r.ok) return setError(r.error);
       return done(r.user, "Account created! ₹100 credits added 🎉");
     }
     if (method === "otp") {
       if (!otpSent) {
-        const r = requestOtp(form.phone);
+        const r = await requestOtp(form.phone);
         if (!r.ok) return setError(r.error);
-        setOtpSent(r.otp);
-        toast.info(`Demo OTP: ${r.otp} (sent via SMS in production)`, { duration: 8000 });
+        setOtpSent(r.otp || "sent");
+        if (r.server) toast(`OTP sent to +91 ${form.phone}`);
+        else toast.info(`Demo OTP: ${r.otp} (SMS is sent once MSG91 is configured)`, { duration: 8000 });
         return;
       }
-      const r = verifyOtp(form.phone, form.otp);
+      const r = await verifyOtp(form.phone, form.otp);
       if (!r.ok) {
         if (r.needsSignup) setMode("signup");
         return setError(r.error);
       }
       return done(r.user);
     }
-    const r = login(form.email, form.password);
+    const r = await login(form.email, form.password);
     if (!r.ok) return setError(r.error);
     done(r.user);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const issues = passwordIssues(form.password);

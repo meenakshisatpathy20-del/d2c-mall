@@ -6,8 +6,8 @@
  * (out for delivery, delivered, NDR) and failed-delivery handling.
  */
 import crypto from "node:crypto";
-import { ApiError, handler, readJson, requireEnv } from "../_lib/http.js";
-import { mapStatus } from "../_lib/shiprocket.js";
+import { ApiError, handler, readJson, requireEnv } from "../../_lib/http.js";
+import { mapStatus } from "../../_lib/shiprocket.js";
 
 export default handler(
   ["POST"],

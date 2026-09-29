@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Boxes, CheckCircle2, CreditCard, IndianRupee, Package, RotateCcw, ShoppingCart, Store, Truck, XCircle } from "lucide-react";
+import { AlertTriangle, Boxes, CheckCircle2, CreditCard, IndianRupee, Package, RotateCcw, ShoppingCart, Store, Truck } from "lucide-react";
 import { useStore } from "../../lib/store";
 import { productMap } from "../../data/catalog";
 import { warehouses } from "../../data/logistics";
 import { ORDER_STATUS, deriveOrderStatus, shipmentEvents } from "../../lib/orderModel";
 import { paymentMode } from "../../lib/services/payments";
+import { useBackend } from "../../lib/api";
 import { compact, formatDateTime, formatINR } from "../../lib/format";
 import { StatusPill } from "../common/ui";
 import { AdminHeader, BarChart, HBars, Kpi } from "./AdminBits";
@@ -23,6 +24,8 @@ export default function AdminDashboard({ admin }) {
   const returns = useStore((s) => s.returns);
   const apps = useStore((s) => s.franchiseApps);
   const orders = useMemo(() => scopeOrders(allOrders, admin), [allOrders, admin]);
+  const backend = useBackend();
+  const ig = backend.integrations || {};
   const now = Date.now();
 
   const stats = useMemo(() => {
@@ -150,13 +153,15 @@ export default function AdminDashboard({ admin }) {
           <div className="col gap-10 mt-16">
             {[
               ["Storefront", true, "Operational"],
-              ["Razorpay payments", true, paymentMode() === "live" ? "Live mode" : "Sandbox mode"],
-              ["Shiprocket logistics", true, "Polling every 10s"],
-              ["Notifications (Email/SMS/WA)", true, "Queued via API"],
+              ["Backend API", backend.available, backend.checked ? (backend.available ? "Connected" : "Not deployed · demo mode") : "Checking…"],
+              ["Database (Upstash Redis)", !!ig.db, ig.db ? "Connected" : "Demo data in browser"],
+              ["Razorpay payments", paymentMode() === "live" && !!ig.razorpay, paymentMode() === "live" ? (ig.razorpay ? "Live keys" : "Server keys missing") : "Sandbox gateway"],
+              ["Shiprocket logistics", !!ig.shiprocket, ig.shiprocket ? "Live AWB & tracking" : "Simulated shipments"],
+              ["SMS / WhatsApp / Email", !!ig.notifications, ig.notifications ? "Provider connected" : "In-app only"],
               ["Payment failures (24h)", stats.failedPayments < 3, `${stats.failedPayments} failed`],
             ].map(([n, ok, s]) => (
               <div key={n} className="row gap-10 small">
-                {ok ? <CheckCircle2 size={16} className="text-green" /> : <XCircle size={16} className="text-red" />}
+                {ok ? <CheckCircle2 size={16} className="text-green" /> : <AlertTriangle size={16} className="text-orange" />}
                 <span className="grow">{n}</span>
                 <span className="xs muted">{s}</span>
               </div>
