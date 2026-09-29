@@ -1,423 +1,209 @@
-.franchise-application-page {
-  min-height: 100vh;
-  padding-bottom: 80px;
-  background: #f8f7f3;
-  color: #101828;
+.fa-layout {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
 }
 
-.franchise-application-header {
-  padding: 35px 7vw 60px;
-  background: #101828;
-  color: #fff;
+.fa-side {
+  position: sticky;
+  top: calc(var(--header-h) + 16px);
 }
 
-.franchise-application-header > button {
-  display: inline-flex;
-  align-items: center;
+.fa-side h1 {
+  margin: 8px 0 4px;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.fa-steps {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #98a2b3;
-  font-size: 9px;
-  font-weight: 800;
-  cursor: pointer;
+  margin-top: 20px;
 }
 
-.franchise-application-header > div {
-  max-width: 720px;
-  margin-top: 55px;
-}
-
-.franchise-application-header span {
-  color: #f45b0b;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-}
-
-.franchise-application-header h1 {
-  margin: 12px 0;
-  font-size: clamp(42px, 6vw, 70px);
-  line-height: 0.94;
-  letter-spacing: -0.065em;
-}
-
-.franchise-application-header h1 em {
-  color: #f45b0b;
-  font-style: normal;
-}
-
-.franchise-application-header p {
-  max-width: 560px;
-  margin: 0;
-  color: #98a2b3;
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.franchise-form {
-  width: min(920px, 90vw);
-  margin: -25px auto 0;
-  position: relative;
-}
-
-.franchise-form-section {
-  margin-bottom: 10px;
-  padding: 27px;
-  border: 1px solid #ddd;
-  background: #fff;
-}
-
-.franchise-form-heading {
+.fa-step {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 25px;
-}
-
-.franchise-form-heading > div {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 37px;
-  height: 37px;
-  flex-shrink: 0;
-  background: #fff2e8;
-  color: #f45b0b;
-}
-
-.franchise-form-heading section > span {
-  color: #98a2b3;
-  font-size: 7px;
-  font-weight: 900;
-}
-
-.franchise-form-heading h2 {
-  margin: 3px 0 4px;
-  font-size: 18px;
-  letter-spacing: -0.035em;
-}
-
-.franchise-form-heading p {
-  margin: 0;
-  color: #98a2b3;
-  font-size: 9px;
-}
-
-.franchise-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.franchise-form-grid label,
-.franchise-message-field {
-  display: block;
-}
-
-.franchise-form-grid label > span,
-.franchise-message-field > span {
-  display: block;
-  margin-bottom: 6px;
-  color: #344054;
-  font-size: 8px;
-  font-weight: 800;
-}
-
-.franchise-form-grid input,
-.franchise-message-field textarea {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 11px 12px;
-  border: 1px solid #d0d5dd;
-  outline: none;
-  background: #fff;
-  color: #101828;
-  font-size: 9px;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-.franchise-form-grid input:focus,
-.franchise-message-field textarea:focus {
-  border-color: #f45b0b;
-  box-shadow: 0 0 0 3px rgba(244, 91, 11, 0.08);
-}
-
-.franchise-form-grid label > small,
-.form-wide-error {
-  display: block;
-  margin-top: 5px;
-  color: #d92d20;
-  font-size: 7px;
-}
-
-.franchise-select {
-  position: relative;
-}
-
-.franchise-select select {
-  width: 100%;
-  appearance: none;
-  box-sizing: border-box;
-  padding: 11px 35px 11px 12px;
-  border: 1px solid #d0d5dd;
-  outline: none;
-  background: #fff;
-  color: #101828;
-  font-size: 9px;
-  cursor: pointer;
-}
-
-.franchise-select svg {
-  position: absolute;
-  top: 50%;
-  right: 10px;
-  pointer-events: none;
-  color: #667085;
-  transform: translateY(-50%);
-}
-
-.franchise-choice-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.franchise-choice-grid button {
-  position: relative;
-  min-height: 105px;
-  padding: 20px;
-  border: 1px solid #d0d5dd;
-  background: #fff;
+  padding: 10px 12px;
+  border-radius: 14px;
   text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease;
+  color: var(--muted);
 }
 
-.franchise-choice-grid button:hover {
-  border-color: #f45b0b;
+.fa-step.active {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
 }
 
-.franchise-choice-grid button.selected {
-  border-color: #f45b0b;
-  background: #fff8f3;
+.fa-step.done {
+  color: var(--ink-2);
 }
 
-.franchise-choice-grid strong {
-  display: block;
-  font-size: 17px;
-}
-
-.franchise-choice-grid span {
-  display: block;
-  max-width: 260px;
-  margin-top: 7px;
-  color: #667085;
-  font-size: 8px;
-  line-height: 1.5;
-}
-
-.franchise-choice-grid svg,
-.franchise-investment-grid svg {
-  position: absolute;
-  top: 13px;
-  right: 13px;
-  color: #f45b0b;
-}
-
-.franchise-investment-grid {
+.fa-step-icon {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--line-2);
+  flex-shrink: 0;
+}
+
+.fa-step.active .fa-step-icon {
+  background: var(--blue);
+  color: #fff;
+}
+
+.fa-step.done .fa-step-icon {
+  background: var(--green);
+  color: #fff;
+}
+
+.fa-tier {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 16px;
+  color: #fff;
+  background: var(--tc);
+}
+
+.fa-title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.choice {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.franchise-investment-grid button {
-  position: relative;
-  min-height: 58px;
-  padding: 12px;
-  border: 1px solid #d0d5dd;
-  background: #fff;
-  color: #344054;
-  font-size: 9px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.franchise-investment-grid button:hover,
-.franchise-investment-grid button.selected {
-  border-color: #f45b0b;
-  background: #fff8f3;
-  color: #101828;
-}
-
-.franchise-message-field textarea {
-  min-height: 140px;
-  resize: vertical;
-  line-height: 1.6;
-}
-
-.franchise-form-submit {
+.fa-tier-opt {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1.5px solid var(--line);
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.fa-tier-opt b {
+  font-size: 22px;
+  font-family: var(--display);
+}
+
+.fa-tier-opt.active {
+  border-color: var(--tc);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tc) 18%, transparent);
+}
+
+.fa-review {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  margin-top: 10px;
+}
+
+.fa-review > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.fa-nav {
+  display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding: 18px;
-  background: #f45b0b;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line-2);
 }
 
-.franchise-form-submit > div {
+.fa-done {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 8px;
-}
-
-.franchise-form-submit > div svg {
-  flex-shrink: 0;
-}
-
-.franchise-form-submit button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-shrink: 0;
-  padding: 12px 17px;
-  border: 0;
-  background: #101828;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.franchise-success {
-  width: min(650px, 90vw);
-  margin: 100px auto;
-  padding: 50px;
-  border: 1px solid #ddd;
-  background: #fff;
+  gap: 10px;
+  padding: 48px 24px;
+  border-radius: 28px;
   text-align: center;
-}
-
-.franchise-success-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 68px;
-  height: 68px;
-  margin: 0 auto 20px;
-  background: #ecfdf3;
-  color: #087443;
-}
-
-.franchise-success > span {
-  color: #087443;
-  font-size: 8px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-}
-
-.franchise-success h1 {
-  margin: 10px 0;
-  font-size: 38px;
-  line-height: 1;
-  letter-spacing: -0.05em;
-}
-
-.franchise-success > p {
-  max-width: 500px;
-  margin: 15px auto 25px;
-  color: #667085;
-  font-size: 10px;
-  line-height: 1.7;
-}
-
-.franchise-success-card {
-  width: fit-content;
-  min-width: 190px;
-  margin: 0 auto 25px;
-  padding: 12px 20px;
-  background: #f8f7f3;
-}
-
-.franchise-success-card span,
-.franchise-success-card strong {
-  display: block;
-}
-
-.franchise-success-card span {
-  color: #98a2b3;
-  font-size: 7px;
-  font-weight: 900;
-}
-
-.franchise-success-card strong {
-  margin-top: 4px;
-  color: #f45b0b;
-  font-size: 14px;
-}
-
-.franchise-success > button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 11px 15px;
-  border: 1px solid #101828;
-  background: #101828;
   color: #fff;
-  font-size: 9px;
-  font-weight: 800;
-  cursor: pointer;
+  background:
+    radial-gradient(50% 90% at 50% 0%, rgba(18, 183, 106, 0.45), transparent 60%),
+    var(--grad-navy);
 }
 
-@media (max-width: 700px) {
-  .franchise-application-header {
-    padding: 25px 5vw 55px;
-  }
+.fa-done svg {
+  color: #75e0a7;
+}
 
-  .franchise-application-header > div {
-    margin-top: 40px;
-  }
+.fa-done h1 {
+  color: #fff;
+  font-family: var(--display);
+  font-size: 34px;
+}
 
-  .franchise-form {
-    width: 90vw;
-  }
+.fa-done p {
+  color: #cbd5ea;
+}
 
-  .franchise-form-section {
-    padding: 20px;
-  }
+.fa-id {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 14px 28px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px dashed rgba(255, 255, 255, 0.4);
+}
 
-  .franchise-form-grid,
-  .franchise-choice-grid {
+.fa-id b {
+  font-size: 26px;
+  letter-spacing: 0.06em;
+}
+
+.fa-id .link {
+  color: #ffb37a;
+}
+
+@media (max-width: 900px) {
+  .fa-layout {
     grid-template-columns: 1fr;
   }
-
-  .franchise-investment-grid {
-    grid-template-columns: 1fr 1fr;
+  .fa-side {
+    position: static;
   }
-
-  .franchise-form-submit {
-    align-items: stretch;
-    flex-direction: column;
+  .fa-steps {
+    flex-direction: row;
+    overflow-x: auto;
   }
-
-  .franchise-form-submit button {
-    width: 100%;
+  .fa-step {
+    min-width: 170px;
   }
-
-  .franchise-success {
-    margin: 50px auto;
-    padding: 30px 20px;
+  .fa-review {
+    grid-template-columns: 1fr;
   }
+}
 
-  .franchise-success h1 {
-    font-size: 31px;
+.fa-layout > * {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .fa-step {
+    min-width: 150px;
+  }
+  .fa-nav .btn {
+    padding: 0 14px;
   }
 }

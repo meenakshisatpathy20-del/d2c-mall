@@ -1,356 +1,102 @@
-import { useMemo, useState } from "react";
-import { ChevronRight, Clock3, Flame, Heart, ShoppingBag, Sparkles, Zap } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { Copy, Flame, Percent, Tag, Zap } from "lucide-react";
+import { bankOffers, getFlashDealProducts, products } from "../../data/catalog";
+import { coupons } from "../../data/coupons";
 import { useShop } from "../../context/ShopContext";
-import {
-  getFlashDealProducts,
-  getProductById,
-  sortProducts,
-} from "../../data/catalog";
+import { formatDate } from "../../lib/format";
+import { toast } from "../../lib/toast";
+import { flashEndsAt } from "../home/FlashDeals";
+import ProductCard from "../common/ProductCard";
+import { Breadcrumbs, Countdown, Rail, SectionHead, useDocumentTitle } from "../common/ui";
+import ListingView from "../shop/ListingView";
 import "./DealsPage.css";
 
-const dealCollections = [
-  {
-    id: "flash",
-    title: "Flash Deals",
-    subtitle: "Limited-time prices. While stock lasts.",
-    icon: Zap,
-  },
-  {
-    id: "trending",
-    title: "Trending Deals",
-    subtitle: "What shoppers are picking right now.",
-    icon: Flame,
-  },
-  {
-    id: "beauty",
-    title: "Beauty Steals",
-    subtitle: "Glow-up essentials at better prices.",
-    icon: Sparkles,
-  },
-];
-
-const dealFilters = ["All Deals", "Under ₹999", "50%+ Off", "Low Stock"];
-
-const formatPrice = (value) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
-
-const getDiscount = (product) =>
-  product.discount ||
-  Math.round(((product.mrp - product.price) / product.mrp) * 100);
-
-function DealCard({ product, onOpen, onAdd }) {
-  const { wishlist, toggleWishlist } = useShop();
-  const isWishlisted = wishlist.some((item) => item.id === product.id);
-  const discount = getDiscount(product);
+export default function DealsPage() {
+  useDocumentTitle("Deals of the day");
+  const { applyCoupon } = useShop();
+  const deals = useMemo(() => products.filter((p) => p.discount >= 30), []);
+  const flash = getFlashDealProducts();
+  const ends = useMemo(flashEndsAt, []);
+  const live = coupons.filter((c) => c.expiresAt > Date.now());
 
   return (
-    <article className="deal-product-card">
-      <button
-        className={`deal-wishlist ${isWishlisted ? "active" : ""}`}
-        onClick={() => toggleWishlist(product)}
-        aria-label="Toggle wishlist"
-      >
-        <Heart size={17} fill={isWishlisted ? "currentColor" : "none"} />
-      </button>
-
-      <button className="deal-product-image" onClick={() => onOpen(product.id)}>
-        <img src={product.image} alt={product.name} />
-        <span className="deal-discount-badge">{discount}% OFF</span>
-        {product.stock <= 10 && (
-          <span className="deal-stock-badge">Only {product.stock} left</span>
-        )}
-      </button>
-
-      <div className="deal-product-info">
-        <span className="deal-brand">{product.brand}</span>
-        <button className="deal-product-name" onClick={() => onOpen(product.id)}>
-          {product.name}
-        </button>
-
-        <div className="deal-rating-row">
-          <span>★ {product.rating}</span>
-          <small>({product.reviewCount || 0})</small>
-        </div>
-
-        <div className="deal-price-row">
-          <strong>{formatPrice(product.price)}</strong>
-          <del>{formatPrice(product.mrp)}</del>
-        </div>
-
-        <button
-          className="deal-add-button"
-          onClick={() => onAdd(product)}
-          disabled={product.stock <= 0}
-        >
-          <ShoppingBag size={15} />
-          {product.stock <= 0 ? "Out of Stock" : "Add to Cart"}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function DealsPage() {
-  const navigate = useNavigate();
-  const { addToCart } = useShop();
-
-  const [activeFilter, setActiveFilter] = useState("All Deals");
-
-  const deals = useMemo(() => {
-    let products = getFlashDealProducts();
-
-    if (!products.length) {
-      products = sortProducts(
-        [
-          getProductById("d2c-women-001"),
-          getProductById("d2c-men-001"),
-          getProductById("d2c-beauty-001"),
-          getProductById("d2c-footwear-001"),
-          getProductById("d2c-jewellery-001"),
-          getProductById("d2c-home-001"),
-        ].filter(Boolean),
-        "discount"
-      );
-    }
-
-    if (activeFilter === "Under ₹999") {
-      products = products.filter((product) => product.price <= 999);
-    }
-
-    if (activeFilter === "50%+ Off") {
-      products = products.filter((product) => getDiscount(product) >= 50);
-    }
-
-    if (activeFilter === "Low Stock") {
-      products = products.filter((product) => product.stock > 0 && product.stock <= 10);
-    }
-
-    return products;
-  }, [activeFilter]);
-
-  const beautyDeals = deals.filter(
-    (product) =>
-      product.category === "beauty" ||
-      product.subCategory?.toLowerCase().includes("beauty")
-  );
-
-  const trendingDeals = deals.filter(
-    (product) => product.tags?.includes("trending") || product.trending
-  );
-
-  return (
-    <main className="deals-page">
-      <section className="deals-hero">
-        <div className="deals-hero-copy">
-          <span className="deals-eyebrow">
-            <Flame size={14} />
-            D2C DAILY DEALS
-          </span>
-
-          <h1>
-            Big picks.
-            <br />
-            <strong>Better prices.</strong>
-          </h1>
-
-          <p>
-            Discover limited-time offers across fashion, beauty, electronics,
-            home and more.
-          </p>
-
-          <div className="deals-hero-actions">
-            <button
-              className="deals-primary-button"
-              onClick={() => document.getElementById("deal-grid")?.scrollIntoView({ behavior: "smooth" })}
-            >
-              Shop deals
-              <ChevronRight size={17} />
-            </button>
-
-            <button
-              className="deals-secondary-button"
-              onClick={() => navigate("/trending")}
-            >
-              Explore trending
-            </button>
-          </div>
-        </div>
-
-        <div className="deals-hero-visual">
-          <div className="deals-price-circle">
-            <small>UP TO</small>
-            <strong>50%</strong>
-            <span>OFF</span>
-          </div>
-
-          <div className="deals-floating-card deals-floating-one">
-            <Zap size={16} />
-            <span>Flash prices</span>
-          </div>
-
-          <div className="deals-floating-card deals-floating-two">
-            <ShoppingBag size={16} />
-            <span>Shop now</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="deals-ticker">
-        <div>
-          <Clock3 size={15} />
-          <strong>LIMITED TIME</strong>
-          <span>Deals refresh regularly</span>
-        </div>
-        <div>
-          <Zap size={15} />
-          <strong>FAST MOVING</strong>
-          <span>Popular picks can sell out quickly</span>
-        </div>
-        <div>
-          <Sparkles size={15} />
-          <strong>NEW DROPS</strong>
-          <span>Fresh offers across categories</span>
-        </div>
-      </section>
-
-      <section className="deals-main" id="deal-grid">
-        <div className="deals-section-heading">
+    <div className="page">
+      <div className="container">
+        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Deals" }]} />
+        <div className="page-hero orange deals-hero">
           <div>
-            <span>SHOP THE DROP</span>
-            <h2>Today’s deals</h2>
+            <span className="eyebrow light">
+              <Flame size={13} /> Deals of the day
+            </span>
+            <h1>Big savings. Verified brands.</h1>
+            <p>Handpicked offers up to 70% off, plus coupons and bank offers stacked at checkout.</p>
           </div>
-
-          <div className="deals-filter-row">
-            {dealFilters.map((filter) => (
-              <button
-                key={filter}
-                className={activeFilter === filter ? "active" : ""}
-                onClick={() => setActiveFilter(filter)}
-              >
-                {filter}
-              </button>
-            ))}
+          <div className="deals-timer">
+            <span className="xs bold" style={{ color: "#ffd2ad" }}>
+              <Zap size={13} /> Flash sale ends in
+            </span>
+            <Countdown target={ends} dark />
           </div>
         </div>
 
-        {deals.length ? (
-          <div className="deal-product-grid">
-            {deals.map((product) => (
-              <DealCard
-                key={product.id}
-                product={product}
-                onOpen={(id) => navigate(`/product/${id}`)}
-                onAdd={addToCart}
-              />
+        <section className="section">
+          <SectionHead eyebrow={<><Tag size={13} /> Coupons</>} title="Coupons you can use today" sub="Tap to copy and auto-apply in your bag" />
+          <div className="coupon-grid">
+            {live.map((c) => (
+              <div key={c.code} className="coupon">
+                <div className="coupon-left">
+                  <Percent size={20} />
+                  <b>{c.type === "percent" ? `${c.value}%` : c.type === "flat" ? `₹${c.value}` : "FREE"}</b>
+                  <span>{c.type === "shipping" ? "Delivery" : "OFF"}</span>
+                </div>
+                <div className="coupon-body">
+                  <b>{c.title}</b>
+                  <p className="xs muted">{c.description}</p>
+                  <div className="row between mt-8">
+                    <span className="coupon-code">{c.code}</span>
+                    <button
+                      className="link small"
+                      onClick={() => {
+                        applyCoupon(c.code);
+                        navigator.clipboard?.writeText(c.code).catch(() => {});
+                        toast(`${c.code} copied & applied to your bag`);
+                      }}
+                    >
+                      <Copy size={13} /> Apply
+                    </button>
+                  </div>
+                  <span className="xs faint">Valid till {formatDate(c.expiresAt)}</span>
+                </div>
+              </div>
             ))}
           </div>
-        ) : (
-          <div className="deals-empty">
-            <Sparkles size={28} />
-            <h3>No deals match this filter</h3>
-            <p>Try another deal collection.</p>
-            <button onClick={() => setActiveFilter("All Deals")}>
-              View all deals
-            </button>
-          </div>
-        )}
-      </section>
-
-      {trendingDeals.length > 0 && (
-        <section className="deal-collection-section">
-          <div className="deals-section-heading">
-            <div>
-              <span>WHAT’S MOVING</span>
-              <h2>Trending for less</h2>
-            </div>
-            <button
-              className="deals-view-all"
-              onClick={() => navigate("/trending")}
-            >
-              View all <ChevronRight size={15} />
-            </button>
-          </div>
-
-          <div className="deal-mini-grid">
-            {trendingDeals.slice(0, 4).map((product) => (
-              <DealCard
-                key={product.id}
-                product={product}
-                onOpen={(id) => navigate(`/product/${id}`)}
-                onAdd={addToCart}
-              />
+          <div className="bank-mini mt-16">
+            {bankOffers.map((o) => (
+              <span key={o.id}>
+                <b>{o.bank}</b> · {o.text}
+              </span>
             ))}
           </div>
         </section>
-      )}
 
-      {beautyDeals.length > 0 && (
-        <section className="deal-collection-section beauty-deals-section">
-          <div className="deals-section-heading">
-            <div>
-              <span>BEAUTY EDIT</span>
-              <h2>Beauty steals</h2>
-            </div>
-            <button
-              className="deals-view-all"
-              onClick={() => navigate("/category/beauty")}
-            >
-              Shop beauty <ChevronRight size={15} />
-            </button>
-          </div>
-
-          <div className="deal-mini-grid">
-            {beautyDeals.slice(0, 4).map((product) => (
-              <DealCard
-                key={product.id}
-                product={product}
-                onOpen={(id) => navigate(`/product/${id}`)}
-                onAdd={addToCart}
-              />
+        <section className="section">
+          <SectionHead eyebrow={<><Zap size={13} /> Lightning deals</>} title="Flash deals" action="Shop all" to="#all-deals" />
+          <Rail>
+            {flash.map((p) => (
+              <ProductCard key={p.id} product={p} />
             ))}
-          </div>
+          </Rail>
         </section>
-      )}
 
-      <section className="deal-collections">
-        {dealCollections.map((collection) => {
-          const Icon = collection.icon;
-
-          return (
-            <button
-              key={collection.id}
-              className="deal-collection-card"
-              onClick={() => {
-                if (collection.id === "beauty") {
-                  navigate("/category/beauty");
-                } else if (collection.id === "trending") {
-                  navigate("/trending");
-                } else {
-                  document.getElementById("deal-grid")?.scrollIntoView({
-                    behavior: "smooth",
-                  });
-                }
-              }}
-            >
-              <span className="deal-collection-icon">
-                <Icon size={20} />
-              </span>
-              <span>
-                <strong>{collection.title}</strong>
-                <small>{collection.subtitle}</small>
-              </span>
-              <ChevronRight size={18} />
-            </button>
-          );
-        })}
-      </section>
-    </main>
+        <section className="section" id="all-deals">
+          <SectionHead title="All deals · 30% off and more" eyebrow="Filter & sort" />
+          <ListingView products={deals} defaultSort="discount" />
+        </section>
+        <p className="center small muted mt-24">
+          Prices and availability are live. <Link to="/pulse" className="link">See what's selling fast →</Link>
+        </p>
+      </div>
+    </div>
   );
 }
-
-export default DealsPage;
