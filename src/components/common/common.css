@@ -768,3 +768,24 @@
     font-size: 9.5px;
   }
 }
+
+/* Invoice (shared: customer orders + admin) */
+.invoice-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  margin-left: auto;
+  max-width: 320px;
+  font-size: 13px;
+}
+.invoice-totals div {
+  display: flex;
+  justify-content: space-between;
+}
+.invoice-totals .grand {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-weight: 800;
+  font-size: 16px;
+}
