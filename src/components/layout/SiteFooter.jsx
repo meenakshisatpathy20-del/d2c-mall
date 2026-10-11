@@ -82,7 +82,7 @@ export default function SiteFooter() {
         </div>
         <div className="footer-col">
           <h4>Help</h4>
-          <Link to="/orders">Track your order</Link>
+          <Link to="/track">Track your order</Link>
           <Link to="/returns">Returns & refunds</Link>
           <Link to="/account/help">Help centre & FAQs</Link>
           <Link to="/account/help">Contact support</Link>

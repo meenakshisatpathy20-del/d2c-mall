@@ -8,7 +8,7 @@ import { adminLogout, useAdmin } from "../../lib/services/account";
 import { getWarehouse } from "../../data/logistics";
 import { useLiveSync } from "../../lib/services/liveSync";
 import { useStore } from "../../lib/store";
-import { deriveOrderStatus } from "../../lib/orderModel";
+import { deriveOrderStatus, shipmentStatus } from "../../lib/orderModel";
 import { initials } from "../../lib/format";
 import { Denied } from "./AdminBits";
 import AdminDashboard from "./AdminDashboard";
@@ -25,7 +25,7 @@ import "./AdminDashboard.css";
 const NAV = [
   { id: "dashboard", path: "", label: "Dashboard", icon: LayoutDashboard },
   { id: "orders", path: "orders", label: "Orders", icon: Package },
-  { id: "shipments", path: "shipments", label: "Shipments", icon: Truck },
+  { id: "shipments", path: "shipments", label: "Shipping", icon: Truck },
   { id: "inventory", path: "inventory", label: "Inventory", icon: Boxes },
   { id: "warehouses", path: "warehouses", label: "Warehouses", icon: Warehouse },
   { id: "returns", path: "returns", label: "Returns", icon: RotateCcw },
@@ -51,7 +51,7 @@ export default function AdminApp() {
 
   const badges = {
     orders: orders.filter((o) => ["confirmed"].includes(deriveOrderStatus(o))).length,
-    shipments: orders.reduce((t, o) => t + o.shipments.filter((s) => s.manualEvents?.some((e) => e.status === "delivery_failed")).length, 0),
+    shipments: orders.reduce((t, o) => t + o.shipments.filter((s) => { const st = shipmentStatus(s); return st === "new" || st === "delivery_failed"; }).length, 0),
     returns: returns.filter((r) => !["refunded", "cancelled", "rejected", "exchange_shipped"].includes(r.status)).length,
     franchise: apps.filter((a) => a.status === "submitted").length,
   };
@@ -120,7 +120,7 @@ export default function AdminApp() {
           <Routes>
             <Route index element={<AdminDashboard admin={admin} />} />
             <Route path="orders" element={<Gate id="orders" admin={admin}><AdminOrdersPage admin={admin} /></Gate>} />
-            <Route path="shipments" element={<Gate id="shipments" admin={admin}><AdminShipmentsPage admin={admin} /></Gate>} />
+            <Route path="shipments/*" element={<Gate id="shipments" admin={admin}><AdminShipmentsPage admin={admin} /></Gate>} />
             <Route path="inventory" element={<Gate id="inventory" admin={admin}><AdminInventoryPage admin={admin} /></Gate>} />
             <Route path="warehouses" element={<Gate id="warehouses" admin={admin}><AdminWarehousesPage admin={admin} /></Gate>} />
             <Route path="returns" element={<Gate id="returns" admin={admin}><AdminReturnsPage admin={admin} /></Gate>} />

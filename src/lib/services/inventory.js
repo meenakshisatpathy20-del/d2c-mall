@@ -129,3 +129,22 @@ export function sweepExpiredReservations() {
   });
   return expired.length;
 }
+
+/**
+ * Move already-sold stock of some order lines to another warehouse
+ * (used when staff change the pickup warehouse before shipping).
+ */
+export function reallocate(allocs, toWarehouseId, ref, by) {
+  const short = allocs.find((a) => {
+    const row = getState().inventory[a.productId]?.[toWarehouseId];
+    return !row || row.available - row.reserved < a.qty;
+  });
+  if (short) return { ok: false, reason: "Not enough stock at the selected warehouse." };
+  setState((st) =>
+    move(st, allocs.flatMap((a) => [
+      { productId: a.productId, warehouseId: a.warehouseId, qty: a.qty, delta: { available: a.qty, sold: -a.qty }, type: "reallocate-out", ref, by },
+      { productId: a.productId, warehouseId: toWarehouseId, qty: a.qty, delta: { available: -a.qty, sold: a.qty }, type: "reallocate-in", ref, by },
+    ]))
+  );
+  return { ok: true };
+}

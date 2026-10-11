@@ -435,11 +435,16 @@
 
 @media (max-width: 900px) {
   .adm {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .adm-side {
     position: static;
     height: auto;
+    min-width: 0;
+  }
+  .adm-nav,
+  .adm-main {
+    min-width: 0;
   }
   .adm-nav {
     flex-direction: row;

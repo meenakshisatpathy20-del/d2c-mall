@@ -86,6 +86,7 @@ function Storefront() {
             <Route path="/order-success/:orderId" element={<RequireAuth><OrderSuccessPage /></RequireAuth>} />
             <Route path="/orders" element={<RequireAuth><OrdersPage /></RequireAuth>} />
             <Route path="/orders/:orderId" element={<RequireAuth><OrderDetailsPage /></RequireAuth>} />
+            <Route path="/track" element={<ShipmentTrackingPage />} />
             <Route path="/tracking/:shipmentId?" element={<ShipmentTrackingPage />} />
             <Route path="/returns" element={<RequireAuth><ReturnsPage /></RequireAuth>} />
             <Route path="/account/:section?" element={<RequireAuth><AccountPage /></RequireAuth>} />

@@ -96,3 +96,22 @@
   color: var(--blue);
   box-shadow: var(--shadow);
 }
+
+.track-modes { display: inline-flex; gap: 4px; margin-top: 16px; padding: 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.12); }
+.track-modes button { padding: 7px 12px; border-radius: 9px; font-size: 13px; font-weight: 700; color: #cbd5ea; }
+.track-modes button.active { background: #fff; color: var(--navy, #07132f); }
+.track-search .track-phone { max-width: 150px; border-left: 1px solid var(--line); padding-left: 10px; }
+.track-demo { margin-top: 10px; color: #cbd5ea; }
+.track-demo b { color: #fff; }
+.ndr-help { padding: 16px; border-radius: 14px; background: #fff5f5; border: 1.5px solid #ffc9cf; }
+.dcheck { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.dcheck > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.track-how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.track-how .card { display: flex; flex-direction: column; gap: 6px; }
+.route-truck.back { transform: scaleX(-1); }
+
+@media (max-width: 720px) {
+  .track-how { grid-template-columns: 1fr 1fr; }
+  .track-search { flex-wrap: wrap; }
+  .track-search .track-phone { max-width: none; border-left: 0; padding-left: 0; }
+}

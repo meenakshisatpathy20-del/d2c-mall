@@ -27,6 +27,12 @@ export const SHIPMENT_LABEL = {
   reattempt: "Re-attempt scheduled",
   rto: "Returning to origin",
   cancelled: "Cancelled",
+  new: "Order received · packing",
+  awb_assigned: "Packed · ready to ship",
+  rto_initiated: "Returning to seller",
+  rto_in_transit: "Returning to seller",
+  rto_delivered: "Returned to seller",
+  rto_received: "Returned to seller",
 };
 
 export const ORDER_STATUS = {
@@ -40,6 +46,7 @@ export const ORDER_STATUS = {
   cancelled: { label: "Cancelled", tone: "gray" },
   return_requested: { label: "Return requested", tone: "amber" },
   returned: { label: "Returned", tone: "gray" },
+  rto: { label: "Returned to seller", tone: "gray" },
 };
 
 export const TONE_CLASS = {
@@ -125,6 +132,9 @@ export function shipmentEvents(shipment, now = Date.now()) {
 
 export function shipmentStatus(shipment, now = Date.now()) {
   if (shipment?.cancelled) return "cancelled";
+  if (shipment?.stage === "new") return "new";
+  if (shipment?.stage === "ready") return "awb_assigned";
+  if (shipment?.rtoReceivedAt) return "rto_received";
   const ev = shipmentEvents(shipment, now).filter((e) => e.status !== "reassigned");
   return ev.length ? ev[ev.length - 1].status : "created";
 }
@@ -135,7 +145,7 @@ export function nextShipmentEvent(shipment, now = Date.now()) {
 }
 
 export function flowIndex(status) {
-  const map = { delivery_failed: 5, reattempt: 5 };
+  const map = { delivery_failed: 5, reattempt: 5, new: 0, awb_assigned: 0, rto_initiated: 5, rto_in_transit: 5, rto_delivered: 5, rto_received: 5 };
   if (status in map) return map[status];
   return Math.max(0, SHIPMENT_FLOW.findIndex((s) => s.key === status));
 }
@@ -149,9 +159,10 @@ export function deriveOrderStatus(order, now = Date.now()) {
   const statuses = order.shipments.filter((s) => !s.cancelled).map((s) => shipmentStatus(s, now));
   if (!statuses.length) return "cancelled";
   if (statuses.every((s) => s === "delivered")) return "delivered";
+  if (statuses.some((s) => s.startsWith("rto"))) return "rto";
   if (statuses.some((s) => s === "out_for_delivery" || s === "delivery_failed" || s === "reattempt")) return "out_for_delivery";
   if (statuses.some((s) => ["picked_up", "in_transit", "reached_hub", "delivered"].includes(s))) return "shipped";
-  if (statuses.some((s) => s === "pickup_scheduled")) return "processing";
+  if (statuses.some((s) => s === "pickup_scheduled" || s === "awb_assigned")) return "processing";
   return "confirmed";
 }
 
@@ -177,7 +188,7 @@ export function orderTab(status) {
   if (status === "out_for_delivery") return "out_for_delivery";
   if (status === "delivered") return "delivered";
   if (["cancelled", "payment_failed"].includes(status)) return "cancelled";
-  if (["returned", "return_requested"].includes(status)) return "returned";
+  if (["returned", "return_requested", "rto"].includes(status)) return "returned";
   return "processing";
 }
 

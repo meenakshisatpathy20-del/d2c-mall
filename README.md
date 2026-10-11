@@ -61,6 +61,27 @@ Admin console: **`/admin`** (login at `/admin/login`). Franchise status demo:
 
 ---
 
+## Shipping (Shiprocket-style) — how it works
+
+**Customers** (`/track`, no login): track by order ID + phone or AWB, see live scans and expected date,
+fix a failed delivery themselves (new date, new phone/address, or cancel), share the tracking link and
+rate the delivery. Product pages and the tracking page show delivery date, charges and COD by pincode.
+
+**Staff** (Admin → Shipping): Orders tabs New → Ready to ship → Pickup scheduled → In transit → Delivered /
+NDR / RTO / Cancelled · Ship now with courier comparison (price, days, rating, COD) · package & volumetric
+weight · change pickup warehouse · AWB, printable 4×6 label with barcode, invoice, pickup manifest ·
+bulk ship / pickup / labels / manifest · NDR actions · RTO receive & restock · COD remittance ·
+rate calculator · reports (on-time %, NDR %, RTO %, cost, zones) · settings (auto-ship, courier rule,
+COD limits & blocked pincodes, NDR attempts, remittance cycle). Roles: Logistics/Super Admin full,
+Warehouse Admin own hub only, Support NDR only.
+
+Statuses after pickup come only from courier scans (Shiprocket webhook in live mode, simulator in demo
+mode). The warehouse is auto-allocated (stock → distance → delivery time → courier coverage); staff
+can change it before shipping.
+
+Go live: set `SHIPROCKET_EMAIL`, `SHIPROCKET_PASSWORD` (API user), `SHIPROCKET_WEBHOOK_TOKEN`, pickup
+names `SR_PICKUP_*`, Upstash DB, and add the webhook `https://<your-app>/api/shiprocket/webhook`.
+
 ## Deploy on Vercel
 
 1. Push this repo to GitHub and **Import** it on [vercel.com](https://vercel.com/new).

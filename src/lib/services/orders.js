@@ -12,7 +12,8 @@ import { getCourier, getWarehouse } from "../../data/logistics";
 import { computeSummary } from "../pricing";
 import { planFulfilment } from "../delivery";
 import { formatINR, uid } from "../format";
-import { buildShipment, newInvoiceNo, newOrderId, shipmentStatus } from "../orderModel";
+import { newInvoiceNo, newOrderId, shipmentStatus } from "../orderModel";
+import { SHIP_STEP_MS, autoShipOrder, createNewShipments } from "./shipping";
 import { commitReservation, releaseReservation, reserveStock, restock } from "./inventory";
 import { createGatewayOrder, openCheckout, verifyPayment } from "./payments";
 import { notify, updateUser } from "./account";
@@ -20,7 +21,7 @@ import { coinsSummary } from "./extras";
 import { api, live } from "../api";
 
 /** Demo logistics clock: each shipment step advances this fast for new orders. */
-export const DEMO_STEP_MS = 3 * 60 * 1000;
+export const DEMO_STEP_MS = SHIP_STEP_MS;
 
 function patchOrder(orderId, patch) {
   setState((st) => ({
@@ -243,18 +244,7 @@ function confirmOrder(orderId, payment) {
   commitReservation(orderId);
   const order = getState().orders.find((o) => o.id === orderId);
   const now = Date.now();
-  const shipments = order.fulfilmentPlan.map((g, i) =>
-    buildShipment({
-      id: `SHP${orderId.slice(-6)}${i + 1}`,
-      warehouseId: g.warehouseId,
-      courierId: g.courierId,
-      lineIds: g.lineIds,
-      createdAt: now + 20000,
-      destCity: order.address.city,
-      stepMs: DEMO_STEP_MS,
-      etaDays: g.days,
-    })
-  );
+  const shipments = createNewShipments(order);
   const instrumentLabel = {
     upi: "UPI",
     card: "Card",
@@ -280,7 +270,7 @@ function confirmOrder(orderId, payment) {
     timeline: [
       ...o.timeline,
       ...(payment.method === "cod" ? [] : [{ status: "paid", at: now, note: "Payment received & Razorpay signature verified" }]),
-      { status: "confirmed", at: now, note: `Order confirmed · ${shipments.length} shipment${shipments.length > 1 ? "s" : ""} created` },
+      { status: "confirmed", at: now, note: `Order confirmed · ${shipments.length} shipment${shipments.length > 1 ? "s" : ""} sent to ${shipments.map((x) => getWarehouse(x.warehouseId).short).join(" & ")} for packing` },
     ],
   }));
 
@@ -317,7 +307,7 @@ function confirmOrder(orderId, payment) {
   if (payment.method !== "cod")
     notify(order.userId, { type: "payment", title: "Payment received", body: `${formatINR(order.pricing.total)} paid via ${instrumentLabel} for order ${orderId}.`, link: `/orders/${orderId}`, channels: ["email", "sms"] });
 
-  syncOrderToServer(orderId, payment);
+  syncOrderToServer(orderId, payment).finally(() => autoShipOrder(orderId));
 }
 
 /**
@@ -342,12 +332,14 @@ async function syncOrderToServer(orderId, payment) {
     patchOrder(orderId, (o) => ({
       serverSynced: true,
       shipments: o.shipments.map((sh) => {
-        const liveShip = r.shipments?.find((x) => x.warehouseId === sh.warehouseId && x.awb);
-        return liveShip ? { ...sh, awb: liveShip.awb, liveCourier: liveShip.courier, trackingUrl: liveShip.trackingUrl, provider: "shiprocket-live" } : sh;
+        const liveShip = r.shipments?.find((x) => x.warehouseId === sh.warehouseId && x.shiprocketShipmentId);
+        if (!liveShip) return sh;
+        const ids = { srShipmentId: liveShip.shiprocketShipmentId, srOrderId: liveShip.shiprocketOrderId, provider: "shiprocket-live" };
+        return liveShip.awb ? { ...sh, ...ids, stage: "pickup", awb: liveShip.awb, liveCourier: liveShip.courier, trackingUrl: liveShip.trackingUrl } : { ...sh, ...ids };
       }),
       timeline: [
         ...o.timeline,
-        { status: "server", at: Date.now(), note: `Confirmed on server${r.persisted ? " & saved" : ""}${r.shipments?.some((x) => x.awb) ? " · Shiprocket AWB generated" : ""}` },
+        { status: "server", at: Date.now(), note: `Confirmed on server${r.persisted ? " & saved" : ""}${r.shipments?.some((x) => x.shiprocketShipmentId) ? " · order created in Shiprocket" : ""}` },
       ],
     }));
   } catch (e) {
