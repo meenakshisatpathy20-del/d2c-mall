@@ -18,7 +18,8 @@ const NOTIFY = {
   picked_up: (o) => ({ title: "Your order has been shipped 🚚", body: `Order ${o.id} is on its way.` }),
   out_for_delivery: (o) => ({ title: "Out for delivery today", body: `Keep your phone handy — order ${o.id} arrives today.` }),
   delivered: (o) => ({ title: "Delivered ✅", body: `Order ${o.id} was delivered. Tell us what you think!` }),
-  delivery_failed: (o) => ({ title: "Delivery attempt failed", body: `We couldn't deliver order ${o.id}. We'll try again.` }),
+  delivery_failed: (o, sh) => ({ title: "Delivery attempt failed — action needed", body: `We couldn't deliver order ${o.id}. Choose a new date or update your address.`, link: `/track?awb=${sh.awb}` }),
+  rto_initiated: (o) => ({ title: "Order is being returned", body: `Order ${o.id} couldn't be delivered and is returning to our warehouse.` }),
 };
 
 export function runSync() {
@@ -38,8 +39,8 @@ export function runSync() {
       const fresh = shipmentEvents(sh, now).filter((e) => e.at > sh.notifiedAt && e.at <= now);
       if (!fresh.length) return sh;
       fresh.forEach((e) => {
-        const msg = NOTIFY[e.status]?.(o);
-        if (msg) notify(o.userId, { type: "shipment", ...msg, link: `/orders/${o.id}`, channels: ["push", "sms", "whatsapp"] });
+        const msg = NOTIFY[e.status]?.(o, sh);
+        if (msg) notify(o.userId, { type: "shipment", link: `/orders/${o.id}`, ...msg, channels: ["push", "sms", "whatsapp"] });
       });
       touched = true;
       return { ...sh, notifiedAt: now };

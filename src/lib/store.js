@@ -8,7 +8,7 @@
 import { useSyncExternalStore } from "react";
 import { createSeedState } from "../data/seed";
 
-const KEY = "d2c_mall_state_v3";
+const KEY = "d2c_mall_state_v4";
 const listeners = new Set();
 
 function load() {
@@ -16,7 +16,7 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.version === 3) return parsed;
+      if (parsed && parsed.version === 4) return parsed;
     }
   } catch {
     /* corrupted storage — reseed */

@@ -145,7 +145,7 @@ export default function OrderDetailsPage() {
                         <ShipmentEvents shipment={s} now={now} city={order.address.city} />
                       </div>
                     </details>
-                    <Link to={`/tracking/${s.id}`} className="link xs mt-8" style={{ display: "inline-flex" }}>
+                    <Link to={`/track?awb=${s.awb || s.id}`} className="link xs mt-8" style={{ display: "inline-flex" }}>
                       Open full tracking page →
                     </Link>
                   </ShipmentCard>

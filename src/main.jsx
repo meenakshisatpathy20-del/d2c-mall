@@ -28,7 +28,7 @@ class RootBoundary extends Component {
               className="btn btn-glass"
               onClick={() => {
                 try {
-                  localStorage.removeItem("d2c_mall_state_v3");
+                  localStorage.removeItem("d2c_mall_state_v4");
                 } catch {
                   /* ignore */
                 }

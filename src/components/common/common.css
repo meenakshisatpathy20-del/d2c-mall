@@ -674,3 +674,97 @@
     display: none;
   }
 }
+
+/* Shipment progress steps (shared: orders, tracking, admin) */
+
+.sprog {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 14px;
+}
+.sprog-step {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.sprog-step::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: -50%;
+  right: 50%;
+  height: 3px;
+  background: var(--line);
+}
+.sprog-step:first-child::before {
+  display: none;
+}
+.sprog-step.done::before,
+.sprog-step.current::before,
+.sprog-step.failed::before {
+  background: var(--green);
+}
+.sprog-dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--line);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+}
+.sprog-step.done .sprog-dot {
+  background: var(--green);
+  border-color: var(--green);
+}
+.sprog-step.current .sprog-dot {
+  border-color: var(--blue);
+  background: var(--blue);
+  box-shadow: 0 0 0 5px rgba(36, 87, 255, 0.15);
+  animation: pulse-dot 1.8s infinite;
+}
+.sprog-step.failed .sprog-dot {
+  background: var(--red);
+  border-color: var(--red);
+}
+.sprog-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--faint);
+  line-height: 1.2;
+}
+.sprog-step.done .sprog-label,
+.sprog-step.current .sprog-label {
+  color: var(--ink-2);
+}
+.sprog-step.failed .sprog-label {
+  color: var(--red-d);
+}
+.sprog.compact {
+  margin-top: 0;
+}
+.sprog.compact .sprog-dot {
+  width: 14px;
+  height: 14px;
+}
+.sprog.compact .sprog-step::before {
+  top: 6px;
+  height: 2px;
+}
+.sprog.compact .sprog-label {
+  font-size: 10px;
+}
+@media (max-width: 640px) {
+  .sprog-label {
+    font-size: 9.5px;
+  }
+}

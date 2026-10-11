@@ -443,7 +443,7 @@ export default function MainHeader() {
             </div>
             <nav className="topbar-links">
               <Link to="/pulse"><Activity size={13} /> D2C Pulse</Link>
-              <Link to="/orders"><Package size={13} /> Track order</Link>
+              <Link to="/track"><Package size={13} /> Track order</Link>
               <Link to="/franchise"><Store size={13} /> Franchise</Link>
               <Link to="/account/help"><LifeBuoy size={13} /> Help</Link>
               <Link to="/admin/login" className="topbar-ops"><Warehouse size={13} /> Warehouse & Admin</Link>

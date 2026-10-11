@@ -8,6 +8,7 @@ import { hashPassword } from "../lib/crypto";
 import { buildShipment, newInvoiceNo } from "../lib/orderModel";
 import { computeSummary } from "../lib/pricing";
 import { seedFranchiseApps } from "./franchise";
+import { NDR_REASONS, defaultPackage, newAwbFor, pickByRule, pickupPlan, quoteForShipment, rtoPlan } from "../lib/shippingModel";
 
 const DAY = 86400000;
 const HOUR = 3600000;
@@ -146,6 +147,50 @@ function makeOrder({ id, userId, customer, addr, lines, createdAt, method = "upi
   };
 }
 
+
+/*
+ * Shipping-console demo states, so every tab of the Shiprocket-style panel has
+ * examples: NEW (awaiting Ship now), READY (AWB, awaiting pickup), NDR waiting
+ * for action, RTO on the way back / back at the warehouse.
+ */
+function withPackageAndCharges(order) {
+  return {
+    ...order,
+    shipments: order.shipments.map((s) => {
+      const items = order.items.filter((i) => s.lineIds.includes(i.lineId));
+      const pkg = defaultPackage(items.map((i) => ({ weightKg: productMap[i.productId]?.weightKg, qty: i.qty })));
+      const q = quoteForShipment(order, { ...s, package: pkg });
+      const c = q.ok ? q.list.find((x) => x.courierId === s.courierId) || q.list[0] : null;
+      return { ...s, package: pkg, charges: c ? { freight: c.freight, cod: c.codCharge, total: c.total, zone: q.zone.id, chargeableKg: q.weight } : null, shippedBy: "Rohan Mehta" };
+    }),
+  };
+}
+
+function stageForDemo(order, kind, now) {
+  const step = 40 * 60000;
+  return {
+    ...order,
+    shipments: order.shipments.map((s, i) => {
+      if (i > 0 && kind !== "new") return s;
+      const wh = warehouses.find((w) => w.id === s.warehouseId);
+      if (kind === "new" || kind === "ready") {
+        const base = { ...s, plan: [], charges: kind === "new" ? null : s.charges, attempts: 0, manualEvents: [{ status: "new", at: order.createdAt + 60000, location: wh.short, note: "Order received at warehouse · packing" }] };
+        if (kind === "new") return { ...base, stage: "new", awb: null, shippedBy: null };
+        const q = quoteForShipment(order, s);
+        const pick = q.ok ? pickByRule(q.list, "recommended") : null;
+        const awb = newAwbFor(pick?.courierId || s.courierId);
+        return { ...base, stage: "ready", courierId: pick?.courierId || s.courierId, awb, shippedAt: now - 25 * 60000, manualEvents: [...base.manualEvents, { status: "awb_assigned", at: now - 25 * 60000, location: wh.short, note: `AWB ${awb} assigned · ${pick?.name || "courier"} · label & invoice generated` }] };
+      }
+      const start = order.createdAt + 2 * HOUR;
+      const plan = pickupPlan({ start, stepMs: step, origin: wh.short, destCity: order.address.city, courierLabel: "Courier", outcome: "failed", reason: NDR_REASONS[(order.id.charCodeAt(order.id.length - 1) + 1) % NDR_REASONS.length] });
+      const failedAt = plan[plan.length - 1].at;
+      if (kind === "ndr") return { ...s, stage: "pickup", plan, attempts: 1, frozen: null };
+      const rto = rtoPlan({ start: kind === "rto_back" ? failedAt + HOUR : now - 20 * 60000, stepMs: kind === "rto_back" ? 30 * 60000 : 6 * HOUR, destCity: order.address.city, origin: wh.short, note: "Return to origin requested by Priya Kapoor" });
+      return { ...s, stage: "pickup", plan: [...plan, ...rto], attempts: 1, ndr: { history: [{ at: failedAt + HOUR, by: "Priya Kapoor", action: "rto", note: "Customer refused delivery" }] } };
+    }),
+  };
+}
+
 export function createSeedState() {
   const now = Date.now();
   const salt = "demo-salt";
@@ -201,6 +246,21 @@ export function createSeedState() {
     }
   });
 
+  // Assign demo shipping states to the admin orders (newest first).
+  const live = otherOrders
+    .map(withPackageAndCharges)
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const pool = live.filter((o) => o.status !== "cancelled" && !o.returnState);
+  const plan = { 0: "new", 1: "new", 2: "new", 3: "new", 4: "ready", 5: "ready" };
+  pool.forEach((o, i) => {
+    const kind = plan[i] || (i === 9 || i === 14 ? "ndr" : i === 11 ? "rto_back" : i === 16 ? "rto_way" : null);
+    if (!kind) return;
+    const idx = live.indexOf(o);
+    const recent = kind === "new" || kind === "ready" ? { createdAt: now - (i + 1) * 47 * 60000 } : {};
+    live[idx] = stageForDemo({ ...o, ...recent }, kind, now);
+  });
+  otherOrders.splice(0, otherOrders.length, ...live);
+
   const returns = [
     {
       id: "RET26091201",
@@ -228,7 +288,7 @@ export function createSeedState() {
   ];
 
   return {
-    version: 3,
+    version: 4,
     session: null,
     adminSession: null,
     pincode: null,

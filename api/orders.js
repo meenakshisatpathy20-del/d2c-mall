@@ -59,10 +59,15 @@ async function createShipments(order) {
           weight: Math.max(0.5, items.reduce((t, i) => t + (i.weightKg || 0.5) * i.qty, 0)),
         },
       });
-      const awb = await sr("/courier/assign/awb", { method: "POST", body: { shipment_id: created.shipment_id } });
-      await sr("/courier/generate/pickup", { method: "POST", body: { shipment_id: [created.shipment_id] } }).catch(() => null);
-      const d = awb?.response?.data || {};
-      out.push({ warehouseId: g.warehouseId, lineIds: g.lineIds, shiprocketShipmentId: created.shipment_id, awb: d.awb_code, courier: d.courier_name, trackingUrl: d.awb_code ? `https://shiprocket.co/tracking/${d.awb_code}` : null });
+      // Like Shiprocket: the order lands as NEW. Staff assign the courier/AWB with
+      // "Ship now" in the admin Shipping console, unless auto-ship is enabled.
+      let d = {};
+      if (process.env.SHIPROCKET_AUTO_SHIP === "true") {
+        const awb = await sr("/courier/assign/awb", { method: "POST", body: { shipment_id: created.shipment_id } });
+        await sr("/courier/generate/pickup", { method: "POST", body: { shipment_id: [created.shipment_id] } }).catch(() => null);
+        d = awb?.response?.data || {};
+      }
+      out.push({ warehouseId: g.warehouseId, lineIds: g.lineIds, shiprocketOrderId: created.order_id, shiprocketShipmentId: created.shipment_id, awb: d.awb_code || null, courier: d.courier_name || null, trackingUrl: d.awb_code ? `https://shiprocket.co/tracking/${d.awb_code}` : null });
       if (d.awb_code && dbConfigured()) await db.set(`awb:${d.awb_code}`, { orderId: order.id, userId: order.userId });
     } catch (e) {
       out.push({ warehouseId: g.warehouseId, lineIds: g.lineIds, error: e.message });

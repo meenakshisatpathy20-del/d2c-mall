@@ -7,6 +7,7 @@ export const TEMPLATES = {
   order_confirmed: (d) => `Hi ${d.name}, your D2C Mall order ${d.orderId} is confirmed! Total Rs.${d.total}. Track: ${d.link}`,
   payment_received: (d) => `Payment of Rs.${d.total} received for order ${d.orderId}. Thank you for shopping with D2C Mall.`,
   shipment_created: (d) => `Order ${d.orderId} is packed and ships via ${d.courier} (AWB ${d.awb}). Track: ${d.link}`,
+  shipment_update: (d) => `${d.text} Track: ${d.link}`,
   out_for_delivery: (d) => `Your D2C Mall order ${d.orderId} is out for delivery today. Keep your phone handy!`,
   delivered: (d) => `Delivered! Order ${d.orderId} has reached you. Rate your purchase: ${d.link}`,
   delivery_failed: (d) => `We couldn't deliver order ${d.orderId}. The courier will re-attempt tomorrow.`,

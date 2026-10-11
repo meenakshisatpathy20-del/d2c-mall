@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, live, useBackend } from "../../lib/api";
-import { useSearchParams } from "react-router-dom";
-import { Download, FastForward, Pause, Search, Truck, X, XCircle, AlertTriangle, RefreshCcw } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Download, Search, Truck, X, XCircle } from "lucide-react";
 import { useStore } from "../../lib/store";
-import { couriers, getCourier, getWarehouse, warehouses } from "../../data/logistics";
+import { getCourier, getWarehouse, warehouses } from "../../data/logistics";
 import { ORDER_STATUS, SHIPMENT_LABEL, deriveOrderStatus, shipmentStatus } from "../../lib/orderModel";
-import { adminShipmentAction, cancelOrder } from "../../lib/services/orders";
+import { cancelOrder } from "../../lib/services/orders";
 import { useNow } from "../../lib/services/liveSync";
 import { cx, formatDateTime, formatINR } from "../../lib/format";
 import { toast } from "../../lib/toast";
@@ -15,33 +15,16 @@ import { AdminHeader, exportCsv } from "./AdminBits";
 import { scopeOrders } from "./AdminDashboard";
 import "./AdminOrdersPage.css";
 
-export function ShipmentOps({ order, shipment, admin }) {
-  const [courier, setCourier] = useState(shipment.courierId);
+export function ShipmentOps({ shipment, admin }) {
   const status = shipmentStatus(shipment);
-  const done = ["delivered", "cancelled"].includes(status);
-  const canOps = ["super_admin", "logistics", "warehouse_admin"].includes(admin.role);
-  if (!canOps || done) return null;
+  const canOps = ["super_admin", "logistics", "warehouse_admin", "support"].includes(admin.role);
+  if (!canOps || ["delivered", "cancelled"].includes(status)) return null;
+  const hint = { new: "Ship now", awb_assigned: "Schedule pickup", delivery_failed: "Take NDR action", rto_delivered: "Mark RTO received" }[status];
   return (
     <div className="ship-ops">
-      <button className="btn btn-xs btn-soft" onClick={() => { adminShipmentAction(order.id, shipment.id, "advance"); toast("Shipment advanced to next status"); }}>
-        <FastForward size={12} /> Advance status
-      </button>
-      <button className="btn btn-xs btn-outline" onClick={() => { adminShipmentAction(order.id, shipment.id, "fail", { reason: "Customer not available at address" }); toast("Marked failed attempt · re-attempt scheduled"); }}>
-        <AlertTriangle size={12} /> Mark failed attempt
-      </button>
-      <button className="btn btn-xs btn-outline" onClick={() => { adminShipmentAction(order.id, shipment.id, "hold"); toast(shipment.frozen ? "Shipment resumed" : "Shipment put on hold"); }}>
-        <Pause size={12} /> {shipment.frozen ? "Resume" : "Hold"}
-      </button>
-      <span className="row gap-4">
-        <select className="select" style={{ height: 28, minHeight: 28, padding: "0 8px", width: "auto", fontSize: 12 }} value={courier} onChange={(e) => setCourier(e.target.value)}>
-          {couriers.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        <button className="btn btn-xs btn-outline" disabled={courier === shipment.courierId} onClick={() => { adminShipmentAction(order.id, shipment.id, "reassign", { courierId: courier }); toast(`Reassigned to ${getCourier(courier).name} · new AWB generated`); }}>
-          <RefreshCcw size={12} /> Reassign
-        </button>
-      </span>
+      <Link to="/admin/shipments" className="btn btn-xs btn-soft">
+        <Truck size={12} /> {hint ? `${hint} in Shipping` : "Open in Shipping"} →
+      </Link>
     </div>
   );
 }
