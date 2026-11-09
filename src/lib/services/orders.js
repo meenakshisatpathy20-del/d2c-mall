@@ -10,6 +10,7 @@ import { getState, setState } from "../store";
 import { productMap } from "../../data/catalog";
 import { getCourier, getWarehouse } from "../../data/logistics";
 import { computeSummary } from "../pricing";
+import { amountDueNow, hasCodAdvance } from "../../data/codAdvance";
 import { planFulfilment } from "../delivery";
 import { formatINR, uid } from "../format";
 import { newInvoiceNo, newOrderId, shipmentStatus } from "../orderModel";
@@ -82,9 +83,12 @@ export async function placeOrder({ user, lines, address, courierChoice = {}, del
   if ((extras.credits || 0) > (freshUser.credits || 0)) return { ok: false, error: "Not enough D2C credits." };
   if ((extras.coins || 0) > coinBalance) return { ok: false, error: "Not enough D2C Coins." };
   if (extras.gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(extras.gstin)) return { ok: false, error: "Enter a valid GSTIN for the GST invoice." };
-  const summary = computeSummary({ items, couponCode, userOrders, usage: s.couponUsage[user.id] || {}, paymentMethod, deliverySpeed, giftWrap: extras.giftWrap, credits: extras.credits, coins: extras.coins });
+  // Every COD order carries a partial advance (₹49 / ₹99) paid online.
+  const codAdvance = paymentMethod === "cod";
+  const summary = computeSummary({ items, couponCode, userOrders, usage: s.couponUsage[user.id] || {}, paymentMethod, deliverySpeed, giftWrap: extras.giftWrap, credits: extras.credits, coins: extras.coins, codAdvance });
   if (couponCode && !summary.couponCode) return { ok: false, error: summary.couponResult?.reason || "Coupon is no longer valid." };
   if (paymentMethod === "cod" && !summary.codAvailable) return { ok: false, error: "COD is not available for orders above ₹20,000." };
+  if (summary.codAdvance && !extras.codAdvanceConsent) return { ok: false, error: `Please accept the ${formatINR(summary.codAdvance)} COD advance terms to continue.` };
 
   // 2. Warehouse allocation
   const plan = planFulfilment(address.pincode, items.map((i) => ({ productId: i.productId, qty: i.qty, weightKg: i.weightKg })), s.inventory);
@@ -129,9 +133,10 @@ export async function placeOrder({ user, lines, address, courierChoice = {}, del
     etaAt: deliverySpeed === "express" ? plan.expressEta : plan.eta,
     payment: {
       method: paymentMethod,
-      status: paymentMethod === "cod" ? "cod_pending" : "pending",
-      gateway: paymentMethod === "cod" ? "cod" : "razorpay",
+      status: summary.codAdvance ? "advance_pending" : paymentMethod === "cod" ? "cod_pending" : "pending",
+      gateway: paymentMethod === "cod" && !summary.codAdvance ? "cod" : "razorpay",
       attempts: [],
+      ...(summary.codAdvance ? { advance: { amount: summary.codAdvance, balance: summary.codBalance, status: "pending" } } : {}),
     },
     shipments: [],
     timeline: [{ status: "placed", at: Date.now(), note: "Order placed" }],
@@ -144,6 +149,7 @@ export async function placeOrder({ user, lines, address, courierChoice = {}, del
       businessName: extras.gstin ? extras.businessName || "" : "",
       instructions: (extras.instructions || "").slice(0, 200),
       slot: extras.slot || "Anytime",
+      ...(summary.codAdvance ? { codAdvanceConsent: { at: Date.now(), amount: summary.codAdvance } } : {}),
     },
   };
 
@@ -164,7 +170,7 @@ export async function placeOrder({ user, lines, address, courierChoice = {}, del
     return { ok: true, order: getState().orders.find((o) => o.id === orderId) };
   }
 
-  if (paymentMethod === "cod") {
+  if (paymentMethod === "cod" && !summary.codAdvance) {
     confirmOrder(orderId, { method: "cod" });
     return { ok: true, order: getState().orders.find((o) => o.id === orderId) };
   }
@@ -176,7 +182,10 @@ export async function placeOrder({ user, lines, address, courierChoice = {}, del
 export async function collectPayment(orderId, { user, address, paymentMethod, onStage = () => {} }) {
   const order = getState().orders.find((o) => o.id === orderId);
   if (!order) return { ok: false, error: "Order not found." };
-  if (order.payment.status === "paid") return { ok: true, order };
+  if (order.payment.status === "paid" || order.payment.advance?.status === "paid") return { ok: true, order };
+  // Partial-advance COD: Razorpay collects only the advance; the order stays COD.
+  const isAdvance = hasCodAdvance(order);
+  const due = amountDueNow(order);
 
   // Re-reserve for retries (stock was released after a failure)
   const active = getState().reservations.find((r) => r.orderId === orderId && r.status === "active");
@@ -189,17 +198,17 @@ export async function collectPayment(orderId, { user, address, paymentMethod, on
   onStage("creating_payment");
   let gatewayOrder;
   try {
-    gatewayOrder = await createGatewayOrder({ orderId, amount: order.pricing.total, customer: user.email, order });
+    gatewayOrder = await createGatewayOrder({ orderId, amount: due, customer: user.email, order });
   } catch (e) {
     releaseReservation(orderId, "release");
     failOrder(orderId, e.message || "Could not create payment order");
     return { ok: false, error: e.message, retry: true, orderId };
   }
-  patchOrder(orderId, (o) => ({ payment: { ...o.payment, method: paymentMethod, razorpayOrderId: gatewayOrder.id, gatewayMode: gatewayOrder.sandbox ? "sandbox" : "live" } }));
-  log({ orderId, event: "gateway_order_created", ref: gatewayOrder.id, amount: order.pricing.total });
+  patchOrder(orderId, (o) => ({ payment: { ...o.payment, method: isAdvance ? "cod" : paymentMethod, razorpayOrderId: gatewayOrder.id, gatewayMode: gatewayOrder.sandbox ? "sandbox" : "live" } }));
+  log({ orderId, event: isAdvance ? "advance_order_created" : "gateway_order_created", ref: gatewayOrder.id, amount: due });
 
   onStage("awaiting_payment");
-  const result = await openCheckout({ gatewayOrder, amount: order.pricing.total, method: paymentMethod, user, address, orderId });
+  const result = await openCheckout({ gatewayOrder, amount: due, method: isAdvance ? null : paymentMethod, user, address, orderId, description: isAdvance ? `COD advance for order ${orderId}` : undefined });
 
   if (result.status !== "success") {
     const reason = result.status === "dismissed" ? "Payment cancelled by customer" : result.error || "Payment failed";
@@ -219,11 +228,12 @@ export async function collectPayment(orderId, { user, address, paymentMethod, on
     return { ok: false, error: "We couldn't verify your payment. Any amount debited will be auto-refunded in 5–7 days.", retry: true, orderId };
   }
 
-  log({ orderId, event: "payment_verified", ref: result.razorpay_payment_id, amount: order.pricing.total });
+  log({ orderId, event: isAdvance ? "advance_verified" : "payment_verified", ref: result.razorpay_payment_id, amount: due });
   onStage("confirming");
   confirmOrder(orderId, {
     proof: gatewayOrder.sandbox ? null : result,
-    method: paymentMethod,
+    method: isAdvance ? "cod" : paymentMethod,
+    advancePaid: isAdvance,
     razorpayPaymentId: result.razorpay_payment_id,
     razorpayOrderId: result.razorpay_order_id,
     signature: result.razorpay_signature,
@@ -253,23 +263,33 @@ function confirmOrder(orderId, payment) {
     cod: "Cash on Delivery",
   }[payment.method];
 
+  const isCod = payment.method === "cod";
+  const advancePaid = isCod && !!payment.advancePaid && hasCodAdvance(order);
+  const gatewayInstrument = payment.instrument && typeof payment.instrument === "string" && payment.instrument.length > 6 ? payment.instrument : null;
+  const advance = order.payment.advance;
+
   patchOrder(orderId, (o) => ({
     status: "confirmed",
     shipments,
     payment: {
       ...o.payment,
-      status: payment.method === "cod" ? "cod_pending" : "paid",
+      status: advancePaid ? "advance_paid" : isCod ? "cod_pending" : "paid",
       razorpayPaymentId: payment.razorpayPaymentId || null,
       razorpayOrderId: payment.razorpayOrderId || o.payment.razorpayOrderId || null,
       signature: payment.signature || null,
-      signatureVerified: payment.method !== "cod",
-      instrument: payment.instrument && typeof payment.instrument === "string" && payment.instrument.length > 6 ? payment.instrument : instrumentLabel,
-      paidAt: payment.method === "cod" ? null : now,
-      attempts: [...o.payment.attempts, { at: now, status: payment.method === "cod" ? "cod" : "success" }],
+      signatureVerified: !isCod || advancePaid,
+      instrument: isCod ? instrumentLabel : gatewayInstrument || instrumentLabel,
+      paidAt: isCod ? null : now,
+      ...(advancePaid ? { advance: { ...o.payment.advance, status: "paid", paidAt: now, instrument: gatewayInstrument || "Online", razorpayPaymentId: payment.razorpayPaymentId || null } } : {}),
+      attempts: [...o.payment.attempts, { at: now, status: advancePaid ? "advance_paid" : isCod ? "cod" : "success" }],
     },
     timeline: [
       ...o.timeline,
-      ...(payment.method === "cod" ? [] : [{ status: "paid", at: now, note: "Payment received & Razorpay signature verified" }]),
+      ...(advancePaid
+        ? [{ status: "paid", at: now, note: `COD advance of ${formatINR(advance.amount)} paid & Razorpay signature verified · ${formatINR(advance.balance)} to be collected on delivery` }]
+        : isCod
+          ? []
+          : [{ status: "paid", at: now, note: "Payment received & Razorpay signature verified" }]),
       { status: "confirmed", at: now, note: `Order confirmed · ${shipments.length} shipment${shipments.length > 1 ? "s" : ""} sent to ${shipments.map((x) => getWarehouse(x.warehouseId).short).join(" & ")} for packing` },
     ],
   }));
@@ -304,7 +324,9 @@ function confirmOrder(orderId, payment) {
     link: `/orders/${orderId}`,
     channels: ["email", "sms", "whatsapp"],
   });
-  if (payment.method !== "cod")
+  if (advancePaid)
+    notify(order.userId, { type: "payment", title: "COD advance received", body: `${formatINR(advance.amount)} advance paid for order ${orderId}. Pay ${formatINR(advance.balance)} in cash or UPI on delivery.`, link: `/orders/${orderId}`, channels: ["email", "sms"] });
+  else if (!isCod)
     notify(order.userId, { type: "payment", title: "Payment received", body: `${formatINR(order.pricing.total)} paid via ${instrumentLabel} for order ${orderId}.`, link: `/orders/${orderId}`, channels: ["email", "sms"] });
 
   syncOrderToServer(orderId, payment).finally(() => autoShipOrder(orderId));
@@ -320,13 +342,14 @@ async function syncOrderToServer(orderId, payment) {
   const isCod = payment.method === "cod";
   const s = getState();
   if (!needServer || (!isCod && !payment.proof) || (isCod && !s.session?.serverToken)) return;
+  const codPayment = payment.advancePaid && payment.proof ? { method: "cod", advance: payment.proof } : { method: "cod" };
   const order = s.orders.find((o) => o.id === orderId);
   try {
     const r = await api("/orders/confirm", {
       method: "POST",
       body: {
         order: { ...order, email: order.email, items: order.items.map((i) => ({ lineId: i.lineId, productId: i.productId, qty: i.qty, size: i.size, color: i.color, name: i.name })), wallet: { credits: order.pricing.creditsUsed || 0, coins: order.pricing.coinsUsed || 0 } },
-        payment: isCod ? { method: "cod" } : payment.proof,
+        payment: isCod ? codPayment : payment.proof,
       },
     });
     patchOrder(orderId, (o) => ({
@@ -374,12 +397,20 @@ export function cancelOrder(orderId, reason, by = "customer") {
   if (by === "customer" && !canCancel(o)) return { ok: false, error: "This order has already been shipped and can't be cancelled. You can return it after delivery." };
   restock(o.allocations || [], "cancel", orderId, by);
   const paid = o.payment.status === "paid";
+  // Cancelled before dispatch → the COD advance is refunded in full.
+  const advanceRefund = o.payment.advance?.status === "paid" ? o.payment.advance.amount : 0;
+  const refundAmount = paid ? o.pricing.total : advanceRefund;
   patchOrder(orderId, (x) => ({
     status: "cancelled",
     cancelReason: reason,
     shipments: x.shipments.map((s) => ({ ...s, cancelled: true, frozen: Date.now() })),
-    payment: { ...x.payment, status: paid ? "refund_initiated" : "cancelled", refundAt: paid ? Date.now() : null },
-    ...addTimeline(x, "cancelled", `Cancelled (${reason})${paid ? ` — refund of ${formatINR(x.pricing.total)} initiated to original payment method` : ""}`),
+    payment: {
+      ...x.payment,
+      status: refundAmount ? "refund_initiated" : "cancelled",
+      refundAt: refundAmount ? Date.now() : null,
+      ...(advanceRefund ? { advance: { ...x.payment.advance, status: "refunded", refundedAt: Date.now() } } : {}),
+    },
+    ...addTimeline(x, "cancelled", `Cancelled (${reason})${refundAmount ? ` — refund of ${formatINR(refundAmount)}${advanceRefund ? " COD advance" : ""} initiated to original payment method` : ""}`),
   }));
   if (o.pricing.creditsUsed || o.pricing.coinsUsed) {
     updateUser(o.userId, (u) => ({
@@ -391,7 +422,7 @@ export function cancelOrder(orderId, reason, by = "customer") {
   notify(o.userId, {
     type: "order",
     title: "Order cancelled",
-    body: paid ? `Refund of ${formatINR(o.pricing.total)} will reach your ${o.payment.instrument || "original payment method"} in 3–5 working days.` : `Order ${orderId} has been cancelled.`,
+    body: refundAmount ? `Refund of ${formatINR(refundAmount)} will reach your ${advanceRefund ? o.payment.advance.instrument || "original payment method" : o.payment.instrument || "original payment method"} in 3–5 working days.` : `Order ${orderId} has been cancelled.`,
     link: `/orders/${orderId}`,
     channels: ["email", "sms"],
   });

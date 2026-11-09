@@ -94,7 +94,11 @@ export function sandboxSign(orderId, paymentId) {
  *  { status: "success", razorpay_order_id, razorpay_payment_id, razorpay_signature, instrument }
  *  { status: "failed", error }  |  { status: "dismissed" }
  */
-export async function openCheckout({ gatewayOrder, amount, method, user, address, orderId }) {
+const GATEWAY_METHODS = ["upi", "card", "netbanking", "wallet"];
+
+export async function openCheckout({ gatewayOrder, amount, method, user, address, orderId, description }) {
+  // COD advance: no preferred method — the customer picks any online option.
+  const prefillMethod = GATEWAY_METHODS.includes(method) ? method : undefined;
   if (KEY_ID && !gatewayOrder.sandbox) {
     const ok = await loadRazorpay();
     if (!ok) return { status: "failed", error: "Could not load Razorpay. Check your connection." };
@@ -105,9 +109,9 @@ export async function openCheckout({ gatewayOrder, amount, method, user, address
         currency: "INR",
         order_id: gatewayOrder.id,
         name: "D2C Mall",
-        description: `Order ${orderId}`,
+        description: description || `Order ${orderId}`,
         image: "/favicon.svg",
-        prefill: { name: user?.name, email: user?.email, contact: address?.phone || user?.phone, method: method === "wallet" ? "wallet" : method },
+        prefill: { name: user?.name, email: user?.email, contact: address?.phone || user?.phone, ...(prefillMethod ? { method: prefillMethod } : {}) },
         notes: { orderId },
         theme: { color: "#2457ff" },
         retry: { enabled: false },
@@ -126,6 +130,7 @@ export async function openCheckout({ gatewayOrder, amount, method, user, address
       gatewayOrderId: gatewayOrder.id,
       amount,
       method,
+      description,
       user,
       resolve: (result) => {
         if (result.status !== "success") return resolve(result);

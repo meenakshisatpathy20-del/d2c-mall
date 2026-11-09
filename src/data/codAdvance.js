@@ -12,10 +12,10 @@
  * The advance is adjusted against the order total (it is not an extra fee),
  * and the usual COD handling fee is waived when an advance is paid.
  *
- * If the customer refuses the parcel at the door (or it goes back to origin
- * because they asked to cancel delivery / were unreachable), the advance is
- * forfeited to cover two-way shipping. If the order is cancelled before it is
- * dispatched, or returned after delivery, the advance is refunded.
+ * The advance is refunded only if the order is cancelled before it is
+ * dispatched. It is forfeited if the customer refuses the parcel at the door,
+ * the parcel goes back to origin for any reason, or the order is returned
+ * after delivery — it covers the shipping cost.
  *
  * This file is shared by the storefront and the serverless API so both
  * compute exactly the same amounts.
@@ -48,7 +48,7 @@ export function codAdvanceFor(orderValue, policy = COD_ADVANCE_POLICY) {
 
 /** One-line policy text shown at checkout, on the order and in the FAQ. */
 export const COD_ADVANCE_FORFEIT_TEXT =
-  "The advance is non-refundable if you refuse the order at delivery or ask the courier to cancel it — it covers the two-way shipping cost. It is fully refunded if you cancel before the order is shipped or return it after delivery.";
+  "The advance is refunded only if you cancel before your order is shipped. It is non-refundable if you refuse the order at delivery, the order is returned to us, or you return it after delivery — it covers the shipping cost.";
 
 export const codAdvanceTierText = (policy = COD_ADVANCE_POLICY) =>
   `₹${policy.below} advance on orders below ₹${policy.threshold.toLocaleString("en-IN")}, ₹${policy.above} on ₹${policy.threshold.toLocaleString("en-IN")} and above`;

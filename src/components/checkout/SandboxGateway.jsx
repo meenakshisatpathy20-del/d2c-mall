@@ -32,7 +32,7 @@ export default function SandboxGateway() {
     () =>
       onSandboxRequest((r) => {
         setReq(r);
-        setTab(r.method === "cod" ? "upi" : r.method);
+        setTab(["upi", "card", "netbanking", "wallet"].includes(r.method) ? r.method : "upi");
         setProcessing(null);
         setCard((c) => ({ ...c, name: r.user?.name?.toUpperCase() || "" }));
       }),
@@ -80,8 +80,9 @@ export default function SandboxGateway() {
               </div>
             </div>
             <div>
-              <div className="xs" style={{ opacity: 0.7 }}>Amount payable</div>
+              <div className="xs" style={{ opacity: 0.7 }}>{req.description ? "COD advance payable" : "Amount payable"}</div>
               <div className="gw-amount">{formatINR(req.amount)}</div>
+              {req.description ? <div className="xs" style={{ opacity: 0.7 }}>{req.description}</div> : null}
             </div>
             <div className="gw-methods">
               {methods.map((m) => (
