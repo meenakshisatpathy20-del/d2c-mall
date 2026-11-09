@@ -1283,6 +1283,16 @@ button:disabled {
   color: var(--ink);
 }
 
+.pd-split {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--blue-soft);
+  border: 1px solid var(--blue-line);
+}
+
 .pd-save {
   padding: 10px 12px;
   border-radius: 12px;
