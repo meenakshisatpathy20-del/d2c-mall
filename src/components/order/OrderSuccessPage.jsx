@@ -8,6 +8,7 @@ import { dayLabel, formatDateTime, formatINR } from "../../lib/format";
 import { getTrendingProducts } from "../../data/catalog";
 import ProductCard from "../common/ProductCard";
 import { Empty, Img, Rail, SectionHead, useDocumentTitle } from "../common/ui";
+import { COD_ADVANCE_FORFEIT_TEXT } from "../../data/codAdvance";
 import "./OrderSuccessPage.css";
 
 const COLORS = ["#ff6b00", "#2457ff", "#12b76a", "#7f56d9", "#ff4056", "#f79009"];
@@ -49,6 +50,7 @@ export default function OrderSuccessPage() {
   }
 
   const cod = order.payment.method === "cod";
+  const advance = cod && order.payment.advance?.status === "paid" ? order.payment.advance : null;
 
   return (
     <div className="page success">
@@ -93,10 +95,24 @@ export default function OrderSuccessPage() {
               <CreditCard size={16} className="text-blue" /> Payment
             </b>
             <p className="small mt-8">
-              <b>{cod ? `Pay ${formatINR(order.pricing.total)} on delivery` : `${formatINR(order.pricing.total)} paid`}</b>
-              <br />
-              {order.payment.instrument}
-              {!cod ? (
+              {advance ? (
+                <>
+                  <b className="text-green">{formatINR(advance.amount)} advance paid</b>
+                  <br />
+                  <b>Pay {formatINR(advance.balance)} on delivery</b>
+                  <br />
+                  <span className="xs muted">
+                    Cash or UPI at your doorstep · order total {formatINR(order.pricing.total)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <b>{cod ? `Pay ${formatINR(order.pricing.total)} on delivery` : `${formatINR(order.pricing.total)} paid`}</b>
+                  <br />
+                  {order.payment.instrument}
+                </>
+              )}
+              {!cod || advance ? (
                 <>
                   <br />
                   <span className="xs text-green bold row gap-4">
@@ -104,6 +120,7 @@ export default function OrderSuccessPage() {
                   </span>
                 </>
               ) : null}
+              {advance ? <span className="xs muted" style={{ display: "block", marginTop: 6 }}>{COD_ADVANCE_FORFEIT_TEXT}</span> : null}
             </p>
           </div>
           <div className="card card-pad">

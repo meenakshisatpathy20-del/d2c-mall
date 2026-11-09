@@ -163,6 +163,18 @@ export function PriceDetails({ summary, children, title = "Price details" }) {
         <span>Total amount</span>
         <span>{formatINR(summary.total)}</span>
       </div>
+      {summary.codAdvance ? (
+        <div className="pd-split">
+          <div className="pd-row">
+            <span>Pay now (COD advance)</span>
+            <b className="text-blue">{formatINR(summary.codAdvance)}</b>
+          </div>
+          <div className="pd-row">
+            <span>Pay on delivery</span>
+            <b>{formatINR(summary.codBalance)}</b>
+          </div>
+        </div>
+      ) : null}
       {summary.savings ? <div className="pd-save">🎉 You're saving {formatINR(summary.savings)} on this order</div> : null}
       {summary.coinsEarn ? <div className="xs muted center">You'll earn <b className="text-orange">{summary.coinsEarn} D2C Coins</b> when this order is delivered</div> : null}
       {children}

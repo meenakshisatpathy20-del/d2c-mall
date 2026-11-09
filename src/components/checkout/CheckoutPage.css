@@ -267,3 +267,40 @@
 .text-purple {
   color: var(--purple);
 }
+
+/* ---------- Partial advance COD ---------- */
+.cod-advance {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--blue-line);
+  border-radius: var(--r);
+  background: var(--blue-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cod-advance-head { display: flex; gap: 10px; align-items: flex-start; color: #1d3fb8; }
+.cod-advance-head b { color: inherit; }
+.cod-split { display: flex; align-items: stretch; gap: 8px; }
+.cod-split-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  background: #fff;
+  border: 1px solid var(--line, #e4e7ec);
+}
+.cod-split-box b { font-size: 20px; line-height: 1.2; }
+.cod-split-box.now { border-color: #2457ff; box-shadow: 0 0 0 1px #2457ff inset; }
+.cod-split-box.now b { color: #2457ff; }
+.cod-split-box.total { background: transparent; border-style: dashed; }
+.cod-split-plus { align-self: center; font-weight: 800; color: #667085; }
+.cod-consent { align-items: flex-start; gap: 8px; line-height: 1.45; }
+.cod-consent input { margin-top: 3px; flex-shrink: 0; }
+@media (max-width: 640px) {
+  .cod-split { flex-direction: column; }
+  .cod-split-plus { display: none; }
+}
