@@ -4,6 +4,7 @@
  */
 import { coupons, findCoupon } from "../data/coupons.js";
 import { formatINR } from "./format.js";
+import { COD_ADVANCE_POLICY, codAdvanceFor } from "../data/codAdvance.js";
 
 export const FREE_SHIPPING_THRESHOLD = 499;
 export const STANDARD_SHIPPING = 49;
@@ -75,6 +76,7 @@ export function computeSummary({
   giftWrap = false,
   credits = 0,
   coins = 0,
+  codAdvance = false,
 }) {
   const { itemTotal, mrpTotal, productDiscount } = lineTotals(items);
   let couponDiscount = 0;
@@ -93,12 +95,21 @@ export function computeSummary({
   const freeShipping = couponFreeShipping || afterDiscount >= FREE_SHIPPING_THRESHOLD;
   let shipping = items.length ? (freeShipping ? 0 : STANDARD_SHIPPING) : 0;
   if (deliverySpeed === "express" && items.length) shipping += EXPRESS_SHIPPING;
-  const codFee = paymentMethod === "cod" ? COD_FEE : 0;
   const giftWrapFee = giftWrap && items.length ? GIFT_WRAP_FEE : 0;
-  const payable = Math.max(afterDiscount + shipping + codFee + giftWrapFee, 0);
-  const coinsUsed = Math.max(0, Math.min(Math.floor(coins) || 0, Math.floor(itemTotal * COINS_MAX_SHARE), payable));
-  const creditsUsed = Math.max(0, Math.min(Math.floor(credits) || 0, payable - coinsUsed));
-  const total = payable - coinsUsed - creditsUsed;
+  const isCod = paymentMethod === "cod";
+
+  // Wallet first (on the amount without the COD fee), then decide the COD split.
+  const baseDue = Math.max(afterDiscount + shipping + giftWrapFee, 0);
+  const coinsUsed = Math.max(0, Math.min(Math.floor(coins) || 0, Math.floor(itemTotal * COINS_MAX_SHARE), baseDue));
+  const creditsUsed = Math.max(0, Math.min(Math.floor(credits) || 0, baseDue - coinsUsed));
+  const net = baseDue - coinsUsed - creditsUsed;
+
+  // Partial-advance COD: pay ₹49 / ₹99 online now, the balance at the door.
+  const advance = isCod && codAdvance ? codAdvanceFor(net) : 0;
+  const codFee = isCod && !(advance && COD_ADVANCE_POLICY.waiveCodFee) && net > 0 ? COD_FEE : 0;
+  const total = net + codFee;
+  const codBalance = isCod ? total - advance : 0;
+  const payNow = isCod ? advance : total;
   const savings = productDiscount + couponDiscount + (freeShipping ? STANDARD_SHIPPING : 0) + coinsUsed;
 
   return {
@@ -113,6 +124,9 @@ export function computeSummary({
     freeShipping,
     amountForFreeShipping: freeShipping ? 0 : Math.max(FREE_SHIPPING_THRESHOLD - afterDiscount, 0),
     codFee,
+    codAdvance: advance,
+    codBalance,
+    payNow,
     giftWrapFee,
     coinsUsed,
     creditsUsed,
