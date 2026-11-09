@@ -28,6 +28,7 @@ import { useShop } from "../../context/ShopContext";
 import { saveAddress, useCurrentUser } from "../../lib/services/account";
 import { planFulfilment } from "../../lib/delivery";
 import { computeSummary } from "../../lib/pricing";
+import { COD_ADVANCE_FORFEIT_TEXT, codAdvanceTierText } from "../../data/codAdvance";
 import { PAYMENT_METHODS, paymentMode } from "../../lib/services/payments";
 import { coinsSummary, isGstin } from "../../lib/services/extras";
 import { live } from "../../lib/api";
@@ -84,6 +85,7 @@ export default function CheckoutPage() {
   const [failure, setFailure] = useState(null);
   const idem = useRef(`idem_${randomId(16)}`);
   const [busy, setBusy] = useState(false);
+  const [codConsent, setCodConsent] = useState(false);
   const allOrders = useStore((st) => st.orders);
   const [ex, setEx] = useState({ giftWrap: false, giftMessage: "", gst: Boolean(user?.gstin), gstin: user?.gstin || "", businessName: user?.businessName || "", instructions: "", slot: "Anytime", useCredits: false, useCoins: false });
   const coinBal = useMemo(() => (user ? coinsSummary(user, allOrders).balance : 0), [user, allOrders]);
@@ -107,8 +109,14 @@ export default function CheckoutPage() {
         giftWrap: ex.giftWrap,
         credits: walletAllowed && ex.useCredits ? user?.credits || 0 : 0,
         coins: walletAllowed && ex.useCoins ? coinBal : 0,
+        codAdvance: method === "cod",
       }),
     [lines, appliedCoupon, userOrders, usage, method, speed, plan, ex, user, coinBal, walletAllowed]
+  );
+  // What the COD option would cost if chosen (shown on the COD card before it is selected).
+  const codPreview = useMemo(
+    () => computeSummary({ items: lines, couponCode: appliedCoupon, userOrders, usage, paymentMethod: "cod", deliverySpeed: plan?.expressAvailable ? speed : "standard", giftWrap: ex.giftWrap, credits: walletAllowed && ex.useCredits ? user?.credits || 0 : 0, coins: walletAllowed && ex.useCoins ? coinBal : 0, codAdvance: true }),
+    [lines, appliedCoupon, userOrders, usage, speed, plan, ex, user, coinBal, walletAllowed]
   );
   const codDisabledReason = !plan?.codAvailable ? "COD isn't available for this pincode" : !summary.codAvailable ? "COD available on orders up to ₹20,000" : lines.some((l) => !l.product.cod) ? "Some items aren't eligible for COD" : null;
 
@@ -135,8 +143,14 @@ export default function CheckoutPage() {
     toast("Address saved");
   };
 
+  const advance = method === "cod" ? summary.codAdvance : 0;
+
   const pay = async () => {
     if (busy) return;
+    if (advance && !codConsent) {
+      toast.error(`Please accept the ${formatINR(advance)} COD advance terms to continue`);
+      return;
+    }
     if (ex.gst && !isGstin(ex.gstin)) {
       toast.error("Enter a valid 15-character GSTIN or untick GST invoice");
       return;
@@ -162,6 +176,7 @@ export default function CheckoutPage() {
         slot: ex.slot,
         credits: summary.creditsUsed,
         coins: summary.coinsUsed,
+        codAdvanceConsent: advance ? codConsent : false,
       },
       onStage: setStage,
     });
@@ -483,7 +498,15 @@ export default function CheckoutPage() {
                           </span>
                           <div className="grow">
                             <b className="small">{m.label}</b>
-                            <p className="xs muted">{disabled ? codDisabledReason : m.id === "cod" ? `${m.sub} · ₹29 handling fee` : m.sub}</p>
+                            <p className="xs muted">
+                              {disabled
+                                ? codDisabledReason
+                                : m.id === "cod"
+                                  ? codPreview.codAdvance
+                                    ? `Pay ${formatINR(codPreview.codAdvance)} advance online now, ${formatINR(codPreview.codBalance)} at your doorstep · No COD fee`
+                                    : `${m.sub} · ₹29 handling fee`
+                                  : m.sub}
+                            </p>
                             {m.offer && !disabled ? <p className="xs text-green bold">{m.offer}</p> : null}
                             {method === m.id && m.id === "upi" && user.savedUpi?.length ? (
                               <p className="xs mt-4">
@@ -501,8 +524,56 @@ export default function CheckoutPage() {
                     })}
                   </div>
 
-                  <button className="btn btn-lg btn-block mt-16" onClick={pay} disabled={busy || !plan?.ok}>
-                    <Lock size={17} /> {summary.total === 0 ? "Place order · paid with wallet" : method === "cod" ? `Place order · ${formatINR(summary.total)}` : `Pay ${formatINR(summary.total)} securely`}
+                  {advance ? (
+                    <div className="cod-advance fade-up">
+                      <div className="cod-advance-head">
+                        <Banknote size={18} />
+                        <div className="grow">
+                          <b>Partial advance for Cash on Delivery</b>
+                          <p className="xs muted">{codAdvanceTierText()} · COD fee waived</p>
+                        </div>
+                      </div>
+                      <div className="cod-split">
+                        <div className="cod-split-box now">
+                          <span className="xs">Pay now (online)</span>
+                          <b>{formatINR(advance)}</b>
+                          <span className="xs muted">UPI · Card · NetBanking · Wallet</span>
+                        </div>
+                        <span className="cod-split-plus">+</span>
+                        <div className="cod-split-box later">
+                          <span className="xs">Pay on delivery</span>
+                          <b>{formatINR(summary.codBalance)}</b>
+                          <span className="xs muted">Cash or UPI at your doorstep</span>
+                        </div>
+                        <span className="cod-split-plus">=</span>
+                        <div className="cod-split-box total">
+                          <span className="xs">Order total</span>
+                          <b>{formatINR(summary.total)}</b>
+                          <span className="xs muted">No extra charges</span>
+                        </div>
+                      </div>
+                      <div className="notice warn">
+                        <AlertTriangle size={16} />
+                        <span>{COD_ADVANCE_FORFEIT_TEXT}</span>
+                      </div>
+                      <label className="check small cod-consent">
+                        <input type="checkbox" checked={codConsent} onChange={(e) => setCodConsent(e.target.checked)} />
+                        <span>
+                          I agree to pay <b>{formatINR(advance)}</b> now and <b>{formatINR(summary.codBalance)}</b> on delivery, and understand the advance is non-refundable if I refuse the order at delivery.
+                        </span>
+                      </label>
+                    </div>
+                  ) : null}
+
+                  <button className="btn btn-lg btn-block mt-16" onClick={pay} disabled={busy || !plan?.ok || (!!advance && !codConsent)}>
+                    <Lock size={17} />{" "}
+                    {summary.total === 0
+                      ? "Place order · paid with wallet"
+                      : advance
+                        ? `Pay ${formatINR(advance)} advance & place order`
+                        : method === "cod"
+                          ? `Place order · ${formatINR(summary.total)}`
+                          : `Pay ${formatINR(summary.total)} securely`}
                   </button>
                   <p className="xs muted center mt-8">
                     By placing this order you agree to D2C Mall's terms. Payments are processed by Razorpay and verified on our server.
@@ -559,7 +630,7 @@ export default function CheckoutPage() {
                 {STAGES.map((s, i) => {
                   const cur = STAGES.findIndex((x) => x.key === stage);
                   const state = i < cur ? "done" : i === cur ? "active" : "";
-                  if (method === "cod" && ["creating_payment", "awaiting_payment", "verifying"].includes(s.key)) return null;
+                  if (method === "cod" && !advance && ["creating_payment", "awaiting_payment", "verifying"].includes(s.key)) return null;
                   return (
                     <div key={s.key} className={cx("stage-row", state)}>
                       <span className="stage-dot">{state === "done" ? <Check size={11} /> : null}</span>
