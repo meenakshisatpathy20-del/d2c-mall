@@ -182,7 +182,7 @@ export default function OrdersPage() {
                       <div>
                         <span className="xs muted">Payment</span>
                         <b className="small row gap-4">
-                          <CreditCard size={13} /> {o.payment.method === "cod" ? "COD" : o.payment.method.toUpperCase()}
+                          <CreditCard size={13} /> {o.payment.method === "cod" ? (o.pricing.codAdvance ? `COD · ${formatINR(o.pricing.codAdvance)} advance` : "COD") : o.payment.method.toUpperCase()}
                         </b>
                       </div>
                       <div>

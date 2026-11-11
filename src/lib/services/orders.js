@@ -10,7 +10,7 @@ import { getState, setState } from "../store";
 import { productMap } from "../../data/catalog";
 import { getCourier, getWarehouse } from "../../data/logistics";
 import { computeSummary } from "../pricing";
-import { amountDueNow, hasCodAdvance } from "../../data/codAdvance";
+import { advanceReturnDeduction, amountDueNow, hasCodAdvance } from "../../data/codAdvance";
 import { planFulfilment } from "../delivery";
 import { formatINR, uid } from "../format";
 import { newInvoiceNo, newOrderId, shipmentStatus } from "../orderModel";
@@ -383,7 +383,8 @@ export function abandonPayment(orderId) {
 
 export function canCancel(order) {
   if (["cancelled", "payment_failed", "delivered", "returned", "return_requested"].includes(order.status)) return false;
-  return order.shipments.every((s) => ["created", "pickup_scheduled"].includes(shipmentStatus(s)));
+  // Cancellable until the courier picks it up (packing, AWB assigned or pickup scheduled).
+  return order.shipments.every((s) => ["new", "awb_assigned", "created", "pickup_scheduled"].includes(shipmentStatus(s)));
 }
 
 export function cancelOrder(orderId, reason, by = "customer") {
@@ -453,7 +454,10 @@ export const RETURN_LABEL = {
 export function requestReturn({ order, lineIds, reason, comment, type, pickupSlot, refundMethod, userId }) {
   const now = Date.now();
   const lines = order.items.filter((i) => lineIds.includes(i.lineId));
-  const amount = lines.reduce((t, i) => t + i.price * i.qty, 0);
+  const itemsValue = lines.reduce((t, i) => t + i.price * i.qty, 0);
+  // COD advance is not refunded on returns — keep it back once per order.
+  const advanceDeducted = type === "exchange" ? 0 : Math.min(itemsValue, advanceReturnDeduction(order, getState().returns));
+  const amount = itemsValue - advanceDeducted;
   const step = DEMO_STEP_MS * 1.5;
   const plan = RETURN_FLOW.map((status, i) => ({
     status: type === "exchange" && status === "refund_initiated" ? "exchange_shipped" : status,
@@ -470,6 +474,7 @@ export function requestReturn({ order, lineIds, reason, comment, type, pickupSlo
     pickupSlot,
     refundMethod,
     refundAmount: type === "exchange" ? 0 : amount,
+    advanceDeducted,
     status: "requested",
     createdAt: now,
     plan,

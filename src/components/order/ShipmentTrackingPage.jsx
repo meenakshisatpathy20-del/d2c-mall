@@ -94,7 +94,14 @@ function NdrSelfHelp({ order, shipment, onDone }) {
           <input className="input" type="date" min={tomorrow} max={max} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
         </label>
       ) : (
-        <p className="small mt-8">The package will go back to our warehouse.{order.payment.method !== "cod" ? " Your payment will be refunded once it arrives." : ""}</p>
+        <>
+          <p className="small mt-8">The package will go back to our warehouse.{order.payment.method !== "cod" ? " Your payment will be refunded once it arrives." : ""}</p>
+          {order.payment.advance?.status === "paid" ? (
+            <div className="notice error mt-8 xs">
+              <AlertTriangle size={14} /> Cancelling delivery means your {formatINR(order.payment.advance.amount)} COD advance will be forfeited — it covers the two-way shipping cost and is non-refundable.
+            </div>
+          ) : null}
+        </>
       )}
       {mode === "update" ? (
         <div className="grid grid-2 mt-8">

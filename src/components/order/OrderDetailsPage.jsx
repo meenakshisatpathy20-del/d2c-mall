@@ -14,6 +14,7 @@ import { Breadcrumbs, Empty, Img, StatusPill, useDocumentTitle } from "../common
 import { ReviewForm } from "../product/ProductReviews";
 import { PAYMENT_METHODS } from "../../lib/services/payments";
 import { CancelModal, InvoiceModal, ShipmentCard, ShipmentEvents, SupportModal } from "./OrderBits";
+import { COD_ADVANCE_FORFEIT_TEXT, advanceView, amountDueNow, hasCodAdvance } from "../../data/codAdvance";
 import "./OrdersPage.css";
 import "./OrderDetailsPage.css";
 
@@ -45,6 +46,8 @@ export default function OrderDetailsPage() {
   const dAt = deliveredAt(order, now);
   const orderReturns = returns.filter((r) => r.orderId === order.id);
   const retryable = status === "payment_failed" && Date.now() - order.createdAt < 60 * 60000;
+  const isAdvance = hasCodAdvance(order);
+  const adv = advanceView(order, status);
 
   const retry = async () => {
     setBusy(true);
@@ -114,7 +117,7 @@ export default function OrderDetailsPage() {
                   ))}
                 </select>
                 <button className="btn btn-blue" onClick={retry} disabled={busy}>
-                  {busy ? <span className="spinner" /> : <RefreshCcw size={15} />} Retry payment of {formatINR(order.pricing.total)}
+                  {busy ? <span className="spinner" /> : <RefreshCcw size={15} />} {isAdvance ? `Pay COD advance of ${formatINR(amountDueNow(order))}` : `Retry payment of ${formatINR(order.pricing.total)}`}
                 </button>
               </div>
             ) : (
@@ -239,8 +242,15 @@ export default function OrderDetailsPage() {
                 <CreditCard size={16} className="text-blue" /> Payment information
               </b>
               <div className="od-pay mt-12">
-                <div><span>Method</span><b>{order.payment.instrument || order.payment.method.toUpperCase()}</b></div>
-                <div><span>Status</span><b style={{ textTransform: "capitalize" }} className={order.payment.status === "paid" ? "text-green" : order.payment.status.includes("fail") ? "text-red" : ""}>{order.payment.status.replace(/_/g, " ")}</b></div>
+                <div><span>Method</span><b>{isAdvance ? "Cash on Delivery + online advance" : order.payment.instrument || order.payment.method.toUpperCase()}</b></div>
+                {adv ? (
+                  <>
+                    <div><span>Advance</span><b className={adv.status === "forfeited" ? "text-red" : adv.status === "pending" ? "" : "text-green"}>{formatINR(adv.amount)} · {adv.label}</b></div>
+                    {adv.instrument ? <div><span>Advance paid via</span><b className="xs">{adv.instrument}</b></div> : null}
+                    <div><span>{adv.balanceStatus === "collected" ? "Paid on delivery" : "Pay on delivery"}</span><b>{adv.balanceStatus === "not_due" ? "—" : formatINR(adv.balance)}{adv.balanceStatus === "due" ? " · Due" : adv.balanceStatus === "collected" ? " · Collected" : ""}</b></div>
+                  </>
+                ) : null}
+                <div><span>Status</span><b style={{ textTransform: "capitalize" }} className={order.payment.status === "paid" || adv?.balanceStatus === "collected" ? "text-green" : order.payment.status.includes("fail") ? "text-red" : ""}>{adv?.balanceStatus === "collected" ? "paid in full" : order.payment.status.replace(/_/g, " ")}</b></div>
                 {order.payment.razorpayOrderId ? <div><span>Gateway order</span><b className="xs">{order.payment.razorpayOrderId}</b></div> : null}
                 {order.payment.razorpayPaymentId ? <div><span>Payment ID</span><b className="xs">{order.payment.razorpayPaymentId}</b></div> : null}
                 {order.payment.paidAt ? <div><span>Paid at</span><b className="xs">{formatDateTime(order.payment.paidAt)}</b></div> : null}
@@ -251,7 +261,9 @@ export default function OrderDetailsPage() {
                   <ShieldCheck size={13} /> Razorpay signature verified on server
                 </p>
               ) : null}
-              {order.payment.status === "refund_initiated" ? <div className="notice info mt-12">Refund of {formatINR(order.pricing.total)} initiated on {formatDate(order.payment.refundAt)}. Expected in 3–5 working days.</div> : null}
+              {order.payment.status === "refund_initiated" ? <div className="notice info mt-12">Refund of {formatINR(adv?.status === "refunded" ? adv.amount : order.pricing.total)}{adv?.status === "refunded" ? " COD advance" : ""} initiated on {formatDate(order.payment.refundAt)}. Expected in 3–5 working days.</div> : null}
+              {adv && ["paid", "pending"].includes(adv.status) ? <div className="notice warn mt-12 xs">{COD_ADVANCE_FORFEIT_TEXT}</div> : null}
+              {adv?.status === "forfeited" ? <div className="notice error mt-12 xs">The {formatINR(adv.amount)} COD advance was forfeited{status === "rto" ? " because the order was not accepted at delivery" : " — the advance is non-refundable on returns"}.</div> : null}
             </div>
 
             {order.extras && (order.extras.giftWrap || order.extras.gstin || order.extras.instructions || (order.extras.slot && order.extras.slot !== "Anytime")) ? (
@@ -277,6 +289,12 @@ export default function OrderDetailsPage() {
               {order.pricing.coinsUsed ? <div className="pd-row"><span>D2C Coins used</span><span className="text-green">−{formatINR(order.pricing.coinsUsed)}</span></div> : null}
               {order.pricing.creditsUsed ? <div className="pd-row"><span>D2C credits used</span><span className="text-green">−{formatINR(order.pricing.creditsUsed)}</span></div> : null}
               <div className="pd-row total"><span>Order total</span><span>{formatINR(order.pricing.total)}</span></div>
+              {adv ? (
+                <div className="pd-split">
+                  <div className="pd-row"><span>Advance paid online</span><b className="text-blue">{formatINR(adv.amount)}</b></div>
+                  <div className="pd-row"><span>{adv.balanceStatus === "collected" ? "Paid on delivery" : "Pay on delivery"}</span><b>{formatINR(adv.balance)}</b></div>
+                </div>
+              ) : null}
             </div>
 
             {orderReturns.length ? (

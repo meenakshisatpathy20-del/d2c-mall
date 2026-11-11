@@ -225,6 +225,7 @@ export function InvoiceModal({ order, open, onClose }) {
           <div className="soft-panel xs">
             <b>Payment</b>
             <div>{order.payment.instrument}</div>
+            {order.payment.advance ? <div>Advance {formatINR(order.payment.advance.amount)} paid online · balance {formatINR(order.payment.advance.balance)} on delivery</div> : null}
             <div>Status: {order.payment.status.replace(/_/g, " ")}</div>
             {order.payment.razorpayPaymentId ? <div>Txn: {order.payment.razorpayPaymentId}</div> : null}
             <div>Place of supply: {order.address.state}</div>
@@ -274,6 +275,12 @@ export function InvoiceModal({ order, open, onClose }) {
           )}
           {order.pricing.coinsUsed || order.pricing.creditsUsed ? <div><span>Paid via D2C Coins / credits</span><span>{formatINR((order.pricing.coinsUsed || 0) + (order.pricing.creditsUsed || 0))}</span></div> : null}
           <div className="grand"><span>Grand total</span><span>{formatINR(order.pricing.total)}</span></div>
+          {order.pricing.codAdvance ? (
+            <>
+              <div><span>Advance paid online (COD)</span><span>{formatINR(order.pricing.codAdvance)}</span></div>
+              <div><span><b>Balance payable on delivery</b></span><span><b>{formatINR(order.pricing.codBalance)}</b></span></div>
+            </>
+          ) : null}
         </div>
         <p className="xs muted mt-16">This is a computer-generated invoice and does not require a signature. Tax rates shown are indicative for this demo.</p>
       </div>
@@ -294,7 +301,7 @@ export function CancelModal({ order, open, onClose }) {
       toast.error(r.error || "Could not cancel");
       return;
     }
-    toast("Order cancelled" + (order.payment.status === "paid" ? " · refund initiated" : ""));
+    toast("Order cancelled" + (order.payment.status === "paid" || order.payment.advance?.status === "paid" ? " · refund initiated" : ""));
     onClose();
   };
   return (
@@ -320,6 +327,11 @@ export function CancelModal({ order, open, onClose }) {
       {order.payment.status === "paid" ? (
         <div className="notice info mt-16">
           Refund of {formatINR(order.pricing.total)} will be credited to {order.payment.instrument} in 3–5 working days.
+        </div>
+      ) : null}
+      {order.payment.advance?.status === "paid" ? (
+        <div className="notice info mt-16">
+          Your order hasn't shipped yet, so your {formatINR(order.payment.advance.amount)} COD advance will be fully refunded to {order.payment.advance.instrument || "your original payment method"} in 3–5 working days.
         </div>
       ) : null}
     </Modal>
