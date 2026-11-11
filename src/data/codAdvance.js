@@ -12,10 +12,10 @@
  * The advance is adjusted against the order total (it is not an extra fee),
  * and the usual COD handling fee is waived when an advance is paid.
  *
- * The advance is refunded only if the order is cancelled before it is
- * dispatched. It is forfeited if the customer refuses the parcel at the door,
- * the parcel goes back to origin for any reason, or the order is returned
- * after delivery — it covers the shipping cost.
+ * Refunded: order cancelled before it ships, or item returned after delivery
+ *           (the return refund is the full item value). Never lost on an exchange.
+ * Kept:     customer refuses the parcel at the door / it goes back to origin —
+ *           the advance covers the two-way shipping cost.
  *
  * This file is shared by the storefront and the serverless API so both
  * compute exactly the same amounts.
@@ -48,7 +48,7 @@ export function codAdvanceFor(orderValue, policy = COD_ADVANCE_POLICY) {
 
 /** One-line policy text shown at checkout, on the order and in the FAQ. */
 export const COD_ADVANCE_FORFEIT_TEXT =
-  "The advance is refunded only if you cancel before your order is shipped. It is non-refundable if you refuse the order at delivery, the order is returned to us, or you return it after delivery — it covers the shipping cost.";
+  "The advance is refunded if you cancel before the order ships or return the item after delivery. It is non-refundable if you refuse the order at delivery — it covers the two-way shipping cost.";
 
 export const codAdvanceTierText = (policy = COD_ADVANCE_POLICY) =>
   `₹${policy.below} advance on orders below ₹${policy.threshold.toLocaleString("en-IN")}, ₹${policy.above} on ₹${policy.threshold.toLocaleString("en-IN")} and above`;
@@ -91,18 +91,9 @@ export function advanceView(order, orderStatus) {
   const adv = order.payment.advance || { amount: order.pricing.codAdvance, balance: order.pricing.codBalance, status: "pending" };
   let status = adv.status || "pending";
   if (status === "paid" && orderStatus === "delivered") status = "adjusted";
-  if (status === "paid" && (orderStatus === "rto" || orderStatus === "returned" || orderStatus === "return_requested")) status = "forfeited";
+  if (status === "paid" && orderStatus === "rto") status = "forfeited";
+  if (status === "paid" && orderStatus === "returned") status = "refunded";
   const balanceStatus = ["delivered", "returned", "return_requested"].includes(orderStatus) ? "collected" : orderStatus === "cancelled" || orderStatus === "rto" ? "not_due" : "due";
   return { ...adv, status, label: ADVANCE_STATUS_LABEL[status] || status, balanceStatus };
 }
 
-/**
- * Advance still to be kept back from a return refund. The advance is not
- * refunded on returns, and it is deducted only once per order even if items
- * are returned in several requests.
- */
-export function advanceReturnDeduction(order, returns = []) {
-  if (!hasCodAdvance(order) || order.payment.advance?.status !== "paid") return 0;
-  const already = returns.filter((r) => r.orderId === order.id && r.status !== "cancelled").reduce((t, r) => t + (r.advanceDeducted || 0), 0);
-  return Math.max(0, order.payment.advance.amount - already);
-}
