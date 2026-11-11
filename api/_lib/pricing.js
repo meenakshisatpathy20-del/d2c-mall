@@ -22,7 +22,9 @@ export function repriceItems(rawItems = []) {
 
 export function serverSummary({ items, couponCode, paymentMethod, deliverySpeed, userOrders = 0, usage = {}, giftWrap = false, credits = 0, coins = 0 }) {
   const priced = repriceItems(items);
-  const summary = computeSummary({ items: priced, couponCode, paymentMethod, deliverySpeed, userOrders, usage, giftWrap, credits, coins });
+  // Every COD order carries a partial advance (₹49 / ₹99) — the server decides, not the browser.
+  const codAdvance = paymentMethod === "cod";
+  const summary = computeSummary({ items: priced, couponCode, paymentMethod, deliverySpeed, userOrders, usage, giftWrap, credits, coins, codAdvance });
   if (couponCode && !summary.couponCode) throw new ApiError(422, "COUPON_INVALID", summary.couponResult?.reason || "Coupon not applicable");
   return { items: priced, summary };
 }

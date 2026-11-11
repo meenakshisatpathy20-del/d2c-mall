@@ -5,6 +5,7 @@
 export const TEMPLATES = {
   otp: (d) => `${d.otp} is your D2C Mall login OTP. Valid for 5 minutes. Do not share it with anyone.`,
   order_confirmed: (d) => `Hi ${d.name}, your D2C Mall order ${d.orderId} is confirmed! Total Rs.${d.total}. Track: ${d.link}`,
+  cod_advance_received: (d) => `COD advance of Rs.${d.advance} received for order ${d.orderId}. Please pay Rs.${d.balance} in cash or UPI on delivery. The advance is non-refundable if the order is refused at delivery.`,
   payment_received: (d) => `Payment of Rs.${d.total} received for order ${d.orderId}. Thank you for shopping with D2C Mall.`,
   shipment_created: (d) => `Order ${d.orderId} is packed and ships via ${d.courier} (AWB ${d.awb}). Track: ${d.link}`,
   shipment_update: (d) => `${d.text} Track: ${d.link}`,

@@ -119,7 +119,7 @@ export const isGstin = (v) => /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
 
 const SEED_QA = [
   ["Is this true to size?", "Yes, most customers find it true to size. If you're between sizes, pick the larger one.", 42],
-  ["Is Cash on Delivery available?", "Yes, COD is available on most pincodes for orders up to ₹20,000.", 31],
+  ["Is Cash on Delivery available?", "Yes, COD is available on most pincodes for orders up to ₹20,000. Pay a small advance online (₹49 below ₹1,000, ₹99 for ₹1,000+) and the rest at your doorstep. The advance is refunded only if you cancel before the order ships.", 31],
   ["What is the return policy?", "Easy returns within the return window shown on this page, with free doorstep pickup.", 27],
 ];
 
