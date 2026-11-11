@@ -349,6 +349,30 @@ export function simulateNextScan(orderId, shipmentId) {
   });
 }
 
+/**
+ * Demo only: make the upcoming delivery attempt fail (customer not reachable),
+ * so the NDR flow can be shown on demand instead of waiting for a random failure.
+ */
+export function simulateFailedDelivery(orderId, shipmentId) {
+  const { shipment } = findShipment(orderId, shipmentId);
+  const plan = shipment?.plan || [];
+  const last = plan[plan.length - 1];
+  const now = Date.now();
+  if (!last || last.status !== "delivered" || last.at <= now) return { ok: false, error: "Schedule pickup first — this works only before the parcel is delivered." };
+  const lastPast = Math.max(shipment.createdAt || 0, ...plan.filter((e) => e.at <= now).map((e) => e.at));
+  const future = plan.filter((e) => e.at > now);
+  const gap = Math.max(1, Math.floor((now - lastPast) / (future.length + 1)));
+  patchShipment(orderId, shipmentId, (s) => ({
+    plan: s.plan.map((e) => {
+      const k = future.indexOf(e);
+      if (k < 0) return e;
+      const at = lastPast + gap * (k + 1);
+      return e === last ? { ...e, at, status: "delivery_failed", note: NDR_REASONS[0] } : { ...e, at };
+    }),
+  }));
+  return { ok: true };
+}
+
 /* ---------- customer side ---------- */
 
 const digits = (v) => String(v || "").replace(/\D/g, "").slice(-10);
