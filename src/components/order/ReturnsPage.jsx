@@ -7,6 +7,7 @@ import { deliveredAt, deriveOrderStatus } from "../../lib/orderModel";
 import { RETURN_LABEL, cancelReturn, requestReturn, returnEvents, returnStatus, returnWindowOpen } from "../../lib/services/orders";
 import { useNow } from "../../lib/services/liveSync";
 import { cx, formatDate, formatDateTime, formatINR } from "../../lib/format";
+import { advanceReturnDeduction } from "../../data/codAdvance";
 import { toast } from "../../lib/toast";
 import { Breadcrumbs, Empty, Img, useDocumentTitle } from "../common/ui";
 import "./ReturnsPage.css";
@@ -54,7 +55,9 @@ function NewReturn({ user, orders, onDone }) {
   const [addressId, setAddressId] = useState(user.addresses.find((a) => a.pincode === order?.address.pincode)?.id || user.addresses[0]?.id);
 
   const chosen = eligibleLines.filter((i) => lines.includes(i.lineId));
-  const amount = chosen.reduce((t, i) => t + i.price * i.qty, 0);
+  const itemsValue = chosen.reduce((t, i) => t + i.price * i.qty, 0);
+  const advanceKept = type === "exchange" || !order ? 0 : Math.min(itemsValue, advanceReturnDeduction(order, returns));
+  const amount = itemsValue - advanceKept;
 
   const submit = () => {
     if (!chosen.length) return toast.error("Select at least one item");
@@ -182,6 +185,7 @@ function NewReturn({ user, orders, onDone }) {
         <div>
           <span className="xs muted">{chosen.length} item(s) selected</span>
           <b style={{ display: "block", fontSize: 18 }}>{type === "exchange" ? "Free exchange" : `Refund ${formatINR(amount)}`}</b>
+          {advanceKept ? <span className="xs muted" style={{ display: "block" }}>Items {formatINR(itemsValue)} − {formatINR(advanceKept)} COD advance (non-refundable on returns)</span> : null}
         </div>
         <button className="btn btn-lg" onClick={submit} disabled={!chosen.length}>
           Confirm {type}

@@ -3,6 +3,8 @@
  * Body: { receipt, items:[{productId,qty,size,color}], couponCode?, paymentMethod?, deliverySpeed?, amount? }
  * The amount is recomputed on the server from the catalogue + coupon rules;
  * if the browser's amount differs, the request is rejected (price tampering).
+ * For COD orders the Razorpay order is for the partial advance only (₹49 / ₹99);
+ * the balance is collected on delivery.
  * The Razorpay key secret never leaves the server.
  */
 import { ApiError, handler, readJson, requireEnv, validate } from "../../_lib/http.js";
@@ -24,7 +26,8 @@ export default handler(
       const claims = bearer ? verifyJwt(bearer) : null;
       await verifyWallet({ credits: body.credits, coins: body.coins, claims, db, dbConfigured });
       const { summary } = serverSummary({ items: body.items, couponCode: body.couponCode, paymentMethod: body.paymentMethod, deliverySpeed: body.deliverySpeed, giftWrap: body.giftWrap, credits: body.credits, coins: body.coins });
-      amount = Math.round(summary.total * 100);
+      if (body.paymentMethod === "cod" && !summary.codAdvance) throw new ApiError(422, "NO_ADVANCE_DUE", "This COD order has no online advance to pay");
+      amount = Math.round(summary.payNow * 100);
       if (body.amount && Math.abs(body.amount - amount) > 100) throw new ApiError(409, "PRICE_CHANGED", "Prices changed — please review your bag", { expected: amount / 100 });
     }
     if (!Number.isInteger(amount) || amount < 100 || amount > 50_000_000) throw new ApiError(422, "INVALID_AMOUNT", "Amount must be between ₹1 and ₹5,00,000");

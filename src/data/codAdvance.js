@@ -80,3 +80,29 @@ export const ADVANCE_STATUS_LABEL = {
   refunded: "Refunded",
   forfeited: "Forfeited",
 };
+
+/**
+ * What the customer sees about the advance on an order, given its derived
+ * status (from orderModel.deriveOrderStatus). Delivered → the advance was
+ * adjusted against the total and the balance collected.
+ */
+export function advanceView(order, orderStatus) {
+  if (!hasCodAdvance(order)) return null;
+  const adv = order.payment.advance || { amount: order.pricing.codAdvance, balance: order.pricing.codBalance, status: "pending" };
+  let status = adv.status || "pending";
+  if (status === "paid" && orderStatus === "delivered") status = "adjusted";
+  if (status === "paid" && (orderStatus === "rto" || orderStatus === "returned" || orderStatus === "return_requested")) status = "forfeited";
+  const balanceStatus = ["delivered", "returned", "return_requested"].includes(orderStatus) ? "collected" : orderStatus === "cancelled" || orderStatus === "rto" ? "not_due" : "due";
+  return { ...adv, status, label: ADVANCE_STATUS_LABEL[status] || status, balanceStatus };
+}
+
+/**
+ * Advance still to be kept back from a return refund. The advance is not
+ * refunded on returns, and it is deducted only once per order even if items
+ * are returned in several requests.
+ */
+export function advanceReturnDeduction(order, returns = []) {
+  if (!hasCodAdvance(order) || order.payment.advance?.status !== "paid") return 0;
+  const already = returns.filter((r) => r.orderId === order.id && r.status !== "cancelled").reduce((t, r) => t + (r.advanceDeducted || 0), 0);
+  return Math.max(0, order.payment.advance.amount - already);
+}

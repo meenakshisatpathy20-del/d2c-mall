@@ -5,7 +5,9 @@
  *   GET  /api/orders/list                          (Bearer customer token)
  *
  * payment = { razorpay_order_id, razorpay_payment_id, razorpay_signature }  (prepaid)
- *         | { method: "cod" }                                                (requires login token)
+ *         | { method: "cod", advance: { razorpay_order_id, razorpay_payment_id, razorpay_signature } }
+ *                                                   (COD with partial advance — the advance proves the order)
+ *         | { method: "cod" }                       (plain COD, only when no advance is due; requires login)
  */
 import crypto from "node:crypto";
 import { ApiError, handler, readJson, validate } from "./_lib/http.js";
@@ -89,8 +91,10 @@ const confirm = handler(
     const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     if (bearer) claims = verifyJwt(bearer);
     const cod = payment.method === "cod";
-    if (cod && !claims) throw new ApiError(401, "UNAUTHENTICATED", "Login required for Cash on Delivery");
+    const advanceProof = cod && payment.advance ? payment.advance : null;
+    if (cod && !advanceProof && !claims) throw new ApiError(401, "UNAUTHENTICATED", "Login required for Cash on Delivery");
     if (!cod && !verifySignature(payment)) throw new ApiError(400, "SIGNATURE_INVALID", "Payment signature verification failed");
+    if (advanceProof && !verifySignature(advanceProof)) throw new ApiError(400, "SIGNATURE_INVALID", "COD advance signature verification failed");
 
     // 2. Re-price on the server
     const wallet = order.wallet || {};
@@ -105,8 +109,11 @@ const confirm = handler(
       coins: wallet.coins,
     });
 
+    // COD orders must have paid the partial advance online.
+    if (cod && summary.codAdvance && !advanceProof) throw new ApiError(422, "ADVANCE_REQUIRED", `Pay the ₹${summary.codAdvance} COD advance to place this order`);
+
     // 3. Idempotency — one order per checkout attempt / payment
-    const idemKey = cod ? `idem:${order.idempotencyKey}` : `idem:pay:${payment.razorpay_payment_id}`;
+    const idemKey = advanceProof ? `idem:pay:${advanceProof.razorpay_payment_id}` : cod ? `idem:${order.idempotencyKey}` : `idem:pay:${payment.razorpay_payment_id}`;
     if (dbConfigured()) {
       const fresh = await db.setnx(idemKey, order.id, 86400);
       if (!fresh) {
@@ -125,10 +132,13 @@ const confirm = handler(
       status: "confirmed",
       payment: {
         method: cod ? "cod" : order.payment?.method,
-        status: cod ? "cod_pending" : "paid",
-        razorpayOrderId: payment.razorpay_order_id || null,
-        razorpayPaymentId: payment.razorpay_payment_id || null,
-        signatureVerified: !cod,
+        status: advanceProof ? "advance_paid" : cod ? "cod_pending" : "paid",
+        razorpayOrderId: (advanceProof || payment).razorpay_order_id || null,
+        razorpayPaymentId: (advanceProof || payment).razorpay_payment_id || null,
+        signatureVerified: !cod || !!advanceProof,
+        ...(advanceProof
+          ? { advance: { amount: summary.codAdvance, balance: summary.codBalance, status: "paid", paidAt: Date.now(), razorpayPaymentId: advanceProof.razorpay_payment_id } }
+          : {}),
       },
       serverConfirmedAt: Date.now(),
     };
@@ -154,7 +164,8 @@ const confirm = handler(
     const link = `${process.env.PUBLIC_URL || ""}/orders/${record.id}`;
     const contact = { email: record.email, phone: record.address.phone };
     const notified = await sendNotification({ template: "order_confirmed", data: { name: record.address.name.split(" ")[0], orderId: record.id, total: summary.total, link }, ...contact });
-    if (!cod) await sendNotification({ template: "payment_received", data: { orderId: record.id, total: summary.total }, ...contact, channels: ["email"] });
+    if (advanceProof) await sendNotification({ template: "cod_advance_received", data: { orderId: record.id, advance: summary.codAdvance, balance: summary.codBalance }, ...contact, channels: ["email", "sms"] });
+    else if (!cod) await sendNotification({ template: "payment_received", data: { orderId: record.id, total: summary.total }, ...contact, channels: ["email"] });
     for (const s of shipping.shipments.filter((x) => x.awb)) {
       await sendNotification({ template: "shipment_created", data: { orderId: record.id, courier: s.courier, awb: s.awb, link }, ...contact, channels: ["sms", "whatsapp"] });
     }
