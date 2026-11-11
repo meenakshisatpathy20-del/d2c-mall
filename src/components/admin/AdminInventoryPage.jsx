@@ -74,6 +74,8 @@ const STATUS_FILTERS = [
   ["transit", "In transit"],
 ];
 
+const NO_TRANSFERS = [];
+
 function statusOf(b) {
   if (b.sellable <= 0) return "out";
   if (b.sellable <= b.threshold) return "low";
@@ -93,7 +95,10 @@ export default function AdminInventoryPage({ admin }) {
   const inventory = useStore((s) => s.inventory);
   const movements = useStore((s) => s.stockMovements);
   const reservations = useStore((s) => s.reservations);
-  const transfers = useStore((s) => s.transfers || []);
+  // Select the raw value: returning a new [] here would re-render forever for
+  // demo data saved before transfers existed.
+  const savedTransfers = useStore((s) => s.transfers);
+  const transfers = savedTransfers || NO_TRANSFERS;
   const [params] = useSearchParams();
   const [tab, setTab] = useState("stock");
   const [view, setView] = useState("sku");
