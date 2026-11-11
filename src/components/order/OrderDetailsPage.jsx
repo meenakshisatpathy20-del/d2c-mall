@@ -263,7 +263,7 @@ export default function OrderDetailsPage() {
               ) : null}
               {order.payment.status === "refund_initiated" ? <div className="notice info mt-12">Refund of {formatINR(adv?.status === "refunded" ? adv.amount : order.pricing.total)}{adv?.status === "refunded" ? " COD advance" : ""} initiated on {formatDate(order.payment.refundAt)}. Expected in 3–5 working days.</div> : null}
               {adv && ["paid", "pending"].includes(adv.status) ? <div className="notice warn mt-12 xs">{COD_ADVANCE_FORFEIT_TEXT}</div> : null}
-              {adv?.status === "forfeited" ? <div className="notice error mt-12 xs">The {formatINR(adv.amount)} COD advance was forfeited{status === "rto" ? " because the order was not accepted at delivery" : " — the advance is non-refundable on returns"}.</div> : null}
+              {adv?.status === "forfeited" ? <div className="notice error mt-12 xs">The {formatINR(adv.amount)} COD advance was forfeited because the order was not accepted at delivery.</div> : null}
             </div>
 
             {order.extras && (order.extras.giftWrap || order.extras.gstin || order.extras.instructions || (order.extras.slot && order.extras.slot !== "Anytime")) ? (

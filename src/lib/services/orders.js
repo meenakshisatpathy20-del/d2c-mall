@@ -10,7 +10,7 @@ import { getState, setState } from "../store";
 import { productMap } from "../../data/catalog";
 import { getCourier, getWarehouse } from "../../data/logistics";
 import { computeSummary } from "../pricing";
-import { advanceReturnDeduction, amountDueNow, hasCodAdvance } from "../../data/codAdvance";
+import { amountDueNow, hasCodAdvance } from "../../data/codAdvance";
 import { planFulfilment } from "../delivery";
 import { formatINR, uid } from "../format";
 import { newInvoiceNo, newOrderId, shipmentStatus } from "../orderModel";
@@ -398,7 +398,7 @@ export function cancelOrder(orderId, reason, by = "customer") {
   if (by === "customer" && !canCancel(o)) return { ok: false, error: "This order has already been shipped and can't be cancelled. You can return it after delivery." };
   restock(o.allocations || [], "cancel", orderId, by);
   const paid = o.payment.status === "paid";
-  // Cancelled before dispatch → the COD advance is refunded in full.
+  // Cancelled before shipping → the COD advance is refunded in full.
   const advanceRefund = o.payment.advance?.status === "paid" ? o.payment.advance.amount : 0;
   const refundAmount = paid ? o.pricing.total : advanceRefund;
   patchOrder(orderId, (x) => ({
@@ -423,7 +423,7 @@ export function cancelOrder(orderId, reason, by = "customer") {
   notify(o.userId, {
     type: "order",
     title: "Order cancelled",
-    body: refundAmount ? `Refund of ${formatINR(refundAmount)} will reach your ${advanceRefund ? o.payment.advance.instrument || "original payment method" : o.payment.instrument || "original payment method"} in 3–5 working days.` : `Order ${orderId} has been cancelled.`,
+    body: refundAmount ? `Refund of ${formatINR(refundAmount)}${advanceRefund ? " COD advance" : ""} will reach your ${advanceRefund ? o.payment.advance.instrument || "original payment method" : o.payment.instrument || "original payment method"} in 3–5 working days.` : `Order ${orderId} has been cancelled.`,
     link: `/orders/${orderId}`,
     channels: ["email", "sms"],
   });
@@ -454,10 +454,8 @@ export const RETURN_LABEL = {
 export function requestReturn({ order, lineIds, reason, comment, type, pickupSlot, refundMethod, userId }) {
   const now = Date.now();
   const lines = order.items.filter((i) => lineIds.includes(i.lineId));
-  const itemsValue = lines.reduce((t, i) => t + i.price * i.qty, 0);
-  // COD advance is not refunded on returns — keep it back once per order.
-  const advanceDeducted = type === "exchange" ? 0 : Math.min(itemsValue, advanceReturnDeduction(order, getState().returns));
-  const amount = itemsValue - advanceDeducted;
+  // Returns refund the full item value — this includes any COD advance paid online.
+  const amount = lines.reduce((t, i) => t + i.price * i.qty, 0);
   const step = DEMO_STEP_MS * 1.5;
   const plan = RETURN_FLOW.map((status, i) => ({
     status: type === "exchange" && status === "refund_initiated" ? "exchange_shipped" : status,
@@ -474,7 +472,6 @@ export function requestReturn({ order, lineIds, reason, comment, type, pickupSlo
     pickupSlot,
     refundMethod,
     refundAmount: type === "exchange" ? 0 : amount,
-    advanceDeducted,
     status: "requested",
     createdAt: now,
     plan,

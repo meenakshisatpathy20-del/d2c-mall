@@ -65,9 +65,10 @@ Admin console: **`/admin`** (login at `/admin/login`). Franchise status demo:
 
 Every COD order pays a small advance online and the rest on delivery:
 **₹49** for orders below ₹1,000, **₹99** for ₹1,000 and above (₹1,299 → ₹99 now + ₹1,200 at the door).
-The ₹29 COD fee is waived. The advance is refunded only if the order is cancelled before it ships;
-it is kept if the order is refused at delivery, returned to origin, or returned after delivery
-(the return refund is the item value minus the advance, once per order).
+The ₹29 COD fee is waived. The advance **is refunded** if the order is cancelled before it ships or the
+item is returned after delivery (the return refund is the full item value), and it is never lost on an
+exchange. It is **not refunded** if the customer refuses the order at delivery / it returns to origin —
+it covers the two-way shipping cost.
 
 - Policy & helpers: `src/data/codAdvance.js` (shared by browser and API) · amounts: `computeSummary()` in `src/lib/pricing.js`
 - Checkout shows the split, the policy and a required consent box; Razorpay charges only the advance
