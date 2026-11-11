@@ -42,7 +42,7 @@ export default function SiteFooter() {
             <span className="logo-text">
               <span className="logo-word">
                 <span className="d2c">D2C</span>
-                <span className="mall" style={{ color: "#ff8a3d" }}>MALL</span>
+                <span className="mall" style={{ color: "#ff8a3d" }}>WORLD</span>
               </span>
               <span className="logo-tag" style={{ color: "#8792a6" }}>Direct-to-consumer store</span>
             </span>
@@ -94,7 +94,7 @@ export default function SiteFooter() {
           <Link to="/franchise">Franchise (FOFO / FOCO)</Link>
           <Link to="/franchise/apply">Apply for franchise</Link>
           <Link to="/franchise/status">Application status</Link>
-          <Link to="/brands">Sell on D2C Mall</Link>
+          <Link to="/brands">Sell on D2C World</Link>
           <Link to="/admin/login">Warehouse & admin login</Link>
         </div>
       </div>
@@ -115,7 +115,7 @@ export default function SiteFooter() {
 
       <div className="footer-bottom">
         <div className="container row between wrap gap-16">
-          <span>© {new Date().getFullYear()} D2C Mall. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} D2C World. All rights reserved.</span>
           <span className="row gap-16 wrap">
             <span className="row gap-6"><CreditCard size={14} /> UPI · Visa · Mastercard · RuPay · NetBanking · COD</span>
             <span className="row gap-6"><PackageCheck size={14} /> Shipping via Shiprocket</span>

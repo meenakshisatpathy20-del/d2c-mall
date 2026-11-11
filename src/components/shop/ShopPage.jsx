@@ -15,7 +15,7 @@ export default function ShopPage() {
           header={
             <div className="page-hero">
               <span className="eyebrow light">
-                <LayoutGrid size={13} /> D2C Mall · all products
+                <LayoutGrid size={13} /> D2C World · all products
               </span>
               <h1>Discover products you'll love.</h1>
               <p>Fashion, beauty, footwear, jewellery, electronics and home — from India's growing D2C marketplace.</p>

@@ -29,6 +29,8 @@ function buildInventory() {
         available: weights[i] === 0 && i !== warehouses.length - 1 ? 0 : qty,
         reserved: 0,
         sold: Math.floor(rnd() * 400),
+        damaged: rnd() < 0.12 ? 1 + Math.floor(rnd() * 3) : 0,
+        inTransit: 0,
         threshold: 5,
       };
     });
@@ -300,6 +302,7 @@ export function createSeedState() {
     inventory: buildInventory(),
     reservations: [],
     stockMovements: [],
+    transfers: [],
     users: [
       {
         id: demoUserId,
@@ -318,7 +321,7 @@ export function createSeedState() {
         credits: 250,
         sessions: [
           { id: "s1", device: "Chrome on Windows", location: "Jamshedpur, IN", lastActive: now, current: true },
-          { id: "s2", device: "D2C Mall app · Android", location: "Bengaluru, IN", lastActive: now - 3 * DAY },
+          { id: "s2", device: "D2C World app · Android", location: "Bengaluru, IN", lastActive: now - 3 * DAY },
         ],
       },
       ...customers,

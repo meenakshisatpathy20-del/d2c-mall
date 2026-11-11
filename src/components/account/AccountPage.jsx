@@ -373,7 +373,7 @@ function Payments({ user }) {
     <div className="col gap-16">
       <div className="wallet-card">
         <div>
-          <span className="xs">D2C Mall credits</span>
+          <span className="xs">D2C World credits</span>
           <b>{formatINR(user.credits || 0)}</b>
           <p className="xs">Use credits at checkout. Refunds to credits are instant.</p>
         </div>

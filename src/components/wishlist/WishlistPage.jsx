@@ -20,7 +20,7 @@ export default function WishlistPage() {
   const totalSaving = wishlist.reduce((t, p) => t + (p.mrp - p.price), 0);
 
   const share = async () => {
-    const text = `My D2C Mall wishlist:\n${wishlist.map((p) => `• ${p.brand} ${p.name} — ${formatINR(p.price)}`).join("\n")}`;
+    const text = `My D2C World wishlist:\n${wishlist.map((p) => `• ${p.brand} ${p.name} — ${formatINR(p.price)}`).join("\n")}`;
     try {
       if (navigator.share) await navigator.share({ title: "My wishlist", text });
       else {

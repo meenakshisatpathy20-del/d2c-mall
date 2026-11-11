@@ -1,5 +1,5 @@
 /*
- * Shipping service — the D2C Mall equivalent of the Shiprocket panel.
+ * Shipping service — the D2C World equivalent of the Shiprocket panel.
  *
  * Who changes what (same as Shiprocket):
  *   New → Ready to ship        staff click "Ship now" (or the auto-ship rule)
