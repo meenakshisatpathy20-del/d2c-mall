@@ -36,7 +36,7 @@ export async function sr(path, { method = "GET", body, query } = {}) {
   return data;
 }
 
-/** Map Shiprocket shipment status → D2C Mall shipment status. */
+/** Map Shiprocket shipment status → D2C World shipment status. */
 export function mapStatus(s = "") {
   const v = s.toUpperCase();
   if (v.includes("DELIVERED") && !v.includes("UNDELIVERED")) return "delivered";

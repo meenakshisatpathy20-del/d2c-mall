@@ -1,4 +1,4 @@
-# D2C Mall
+# D2C World
 
 India's home for direct-to-consumer brands — a Myntra/Flipkart-class storefront with
 social commerce (D2C Street), real-time discovery (D2C Pulse), a multi-warehouse

@@ -28,7 +28,7 @@ export function Img({ src, alt = "", className, label, ratio, style, eager, ...r
       {state === "error" || !src ? (
         <div className="img-fallback">
           <ImageOff size={22} />
-          <span>{label || alt || "D2C Mall"}</span>
+          <span>{label || alt || "D2C World"}</span>
         </div>
       ) : null}
     </div>
@@ -382,6 +382,6 @@ export function useScrollTop(dep) {
 
 export function useDocumentTitle(title) {
   useEffect(() => {
-    document.title = title ? `${title} | D2C Mall` : "D2C Mall — India's home for D2C brands";
+    document.title = title ? `${title} | D2C World` : "D2C World — India's home for D2C brands";
   }, [title]);
 }

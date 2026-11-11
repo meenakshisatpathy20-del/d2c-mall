@@ -224,9 +224,9 @@ export function CoinsPanel({ user }) {
 export function ReferEarn({ user }) {
   const code = referralCode(user);
   const link = `${window.location.origin}/login?ref=${code}`;
-  const msg = `Shop India's best D2C brands on D2C Mall! Use my code ${code} to get ₹100 off your first order: ${link}`;
+  const msg = `Shop India's best D2C brands on D2C World! Use my code ${code} to get ₹100 off your first order: ${link}`;
   const share = () => {
-    if (navigator.share) navigator.share({ title: "D2C Mall", text: msg }).catch(() => {});
+    if (navigator.share) navigator.share({ title: "D2C World", text: msg }).catch(() => {});
     else copy(msg, "Invite message copied");
   };
   const referrals = user.referrals || [];

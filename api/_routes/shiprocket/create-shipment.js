@@ -1,6 +1,6 @@
 /*
  * POST /api/shiprocket/create-shipment   (roles: super_admin, logistics, warehouse_admin)
- * Creates a Shiprocket ad-hoc order for one D2C Mall shipment, assigns an AWB
+ * Creates a Shiprocket ad-hoc order for one D2C World shipment, assigns an AWB
  * (optionally a specific courier) and schedules pickup from the warehouse.
  */
 import { ApiError, handler, readJson, validate } from "../../_lib/http.js";

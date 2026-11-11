@@ -48,7 +48,7 @@ export default function AdminLoginPage() {
           <div>
             <b className="alogin-brand">
               <span style={{ color: "#2457ff" }}>D2C</span>
-              <span style={{ color: "#ff6b00" }}>MALL</span>
+              <span style={{ color: "#ff6b00" }}>WORLD</span>
             </b>
             <span className="xs muted" style={{ display: "block" }}>Warehouse & operations console</span>
           </div>

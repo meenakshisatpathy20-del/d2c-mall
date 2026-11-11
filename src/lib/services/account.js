@@ -71,7 +71,7 @@ function registerLocal({ name, email, phone, password }) {
   };
   setState((st) => ({ ...st, users: [...st.users, user] }));
   startSession(user.id);
-  notify(user.id, { type: "account", title: `Welcome to D2C Mall, ${user.name.split(" ")[0]}! 🎉`, body: "₹100 D2C credits added. Use WELCOME100 for ₹100 off your first order.", link: "/shop" });
+  notify(user.id, { type: "account", title: `Welcome to D2C World, ${user.name.split(" ")[0]}! 🎉`, body: "₹100 D2C credits added. Use WELCOME100 for ₹100 off your first order.", link: "/shop" });
   return { ok: true, user };
 }
 
@@ -159,7 +159,7 @@ export async function register(form) {
     try {
       const r = await api("/auth/register", { method: "POST", body: local });
       const user = mirrorServerUser(r.user, r.token);
-      notify(user.id, { type: "account", title: `Welcome to D2C Mall, ${user.name.split(" ")[0]}! 🎉`, body: "₹100 D2C credits added. Use WELCOME100 for ₹100 off your first order.", link: "/shop" });
+      notify(user.id, { type: "account", title: `Welcome to D2C World, ${user.name.split(" ")[0]}! 🎉`, body: "₹100 D2C credits added. Use WELCOME100 for ₹100 off your first order.", link: "/shop" });
       return { ok: true, user, server: true };
     } catch (e) {
       return errMsg(e);

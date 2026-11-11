@@ -99,7 +99,7 @@ export default function FranchisePage() {
         <div className="fr-hero">
           <div>
             <span className="eyebrow light">
-              <Store size={13} /> D2C Mall franchise programme
+              <Store size={13} /> D2C World franchise programme
             </span>
             <h1>
               Bring India's best D2C brands
@@ -292,7 +292,7 @@ export default function FranchisePage() {
 
         <section className="section fr-cta">
           <div>
-            <h2>Ready to open your D2C Mall?</h2>
+            <h2>Ready to open your D2C World?</h2>
             <p>Applications are reviewed within 48 hours. No fee to apply.</p>
           </div>
           <Link to="/franchise/apply" className="btn btn-lg btn-white">

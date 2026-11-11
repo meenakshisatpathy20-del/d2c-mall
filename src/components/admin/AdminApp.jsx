@@ -67,7 +67,7 @@ export default function AdminApp() {
           <div>
             <b>
               <span style={{ color: "#8fb0ff" }}>D2C</span>
-              <span style={{ color: "#ff8a3d" }}>MALL</span>
+              <span style={{ color: "#ff8a3d" }}>WORLD</span>
             </b>
             <span>Operations console</span>
           </div>
