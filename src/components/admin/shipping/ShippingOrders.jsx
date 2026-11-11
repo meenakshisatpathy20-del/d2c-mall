@@ -16,6 +16,7 @@ import {
   ndrAction,
   schedulePickup,
   shipNow,
+  simulateFailedDelivery,
   simulateNextScan,
   updatePackage,
   useShippingSettings,
@@ -282,9 +283,16 @@ function ShipmentDrawer({ row, onClose, admin, now, onShip, onNdr, onLabel }) {
               <span className="xs">
                 <b>Demo mode:</b> courier scans arrive every few minutes. Next: <b>{next.note}</b> at {formatDateTime(next.at)}.
               </span>
-              <button className="btn btn-xs btn-soft" onClick={() => { simulateNextScan(o.id, s.id); toast("Next courier scan simulated"); }}>
-                <FastForward size={12} /> Simulate next scan
-              </button>
+              <div className="row gap-6 wrap">
+                <button className="btn btn-xs btn-soft" onClick={() => { simulateNextScan(o.id, s.id); toast("Next courier scan simulated"); }}>
+                  <FastForward size={12} /> Simulate next scan
+                </button>
+                {s.plan?.[s.plan.length - 1]?.status === "delivered" ? (
+                  <button className="btn btn-xs btn-outline" onClick={() => { const r = simulateFailedDelivery(o.id, s.id); if (r.ok) toast("Failed delivery simulated · moved to NDR"); else toast.error(r.error); }}>
+                    <AlertTriangle size={12} /> Simulate failed delivery
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
           <div>
