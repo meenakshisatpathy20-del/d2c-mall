@@ -691,7 +691,7 @@ const FAQ = [
   ["Payments & refunds", [
     ["Money was debited but the order failed. What now?", "Reserved stock is released and any debited amount is auto-refunded by Razorpay within 5–7 working days. You can also retry payment within 60 minutes from the order page."],
     ["How long do refunds take?", "UPI/cards: 3–5 working days after quality check. D2C credits: instant. Bank transfer: 2–3 working days."],
-    ["Is Cash on Delivery available?", "COD is available on most pincodes for orders up to ₹20,000, with a ₹29 handling fee."],
+    ["Is Cash on Delivery available?", "COD is available on most pincodes for orders up to ₹20,000, with a small online advance: ₹49 on orders below ₹1,000 and ₹99 on ₹1,000 and above. The rest is paid in cash or UPI at delivery, and there is no COD fee. The advance is refunded only if you cancel before the order ships."],
   ]],
   ["Returns & exchanges", [
     ["What is the return policy?", "Most fashion & footwear have 14-day returns and size exchanges. Electronics have 7 days. Beauty & personal care are non-returnable once opened."],
