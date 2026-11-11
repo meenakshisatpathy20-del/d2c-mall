@@ -172,7 +172,7 @@ export default function FranchiseApplication() {
             <span className="eyebrow">
               <Store size={13} /> Franchise application
             </span>
-            <h1>Open your D2C Mall</h1>
+            <h1>Open your D2C World</h1>
             <p className="small muted">Takes about 5 minutes. Your progress is saved automatically.</p>
             <div className="fa-steps">
               {STEPS.map((s, i) => (
@@ -303,12 +303,12 @@ export default function FranchiseApplication() {
                 <Field label="Current business (if any)">
                   <input className="input" value={a.business} onChange={(e) => set("business", e.target.value)} placeholder="e.g. Apparel store, 8 years" />
                 </Field>
-                <Field label="Why D2C Mall? *" error={errors.why} hint={`${a.why.length}/600`}>
+                <Field label="Why D2C World? *" error={errors.why} hint={`${a.why.length}/600`}>
                   <textarea className="textarea" maxLength={600} value={a.why} onChange={(e) => set("why", e.target.value)} placeholder="Tell us about your city, customers and why you'd be a great partner" />
                 </Field>
                 <div className="field">
                   <label>How did you hear about us?</label>
-                  <Choice options={["Instagram", "D2C Mall website", "Friend / referral", "News / event", "Other"]} value={a.heard} onChange={(v) => set("heard", v)} />
+                  <Choice options={["Instagram", "D2C World website", "Friend / referral", "News / event", "Other"]} value={a.heard} onChange={(v) => set("heard", v)} />
                 </div>
               </div>
             ) : null}
@@ -338,7 +338,7 @@ export default function FranchiseApplication() {
                 ))}
                 <label className="check">
                   <input type="checkbox" checked={a.consent} onChange={(e) => set("consent", e.target.checked)} />
-                  <span className="small">I confirm the details are accurate and agree to be contacted by D2C Mall's franchise team by phone, email and WhatsApp.</span>
+                  <span className="small">I confirm the details are accurate and agree to be contacted by D2C World's franchise team by phone, email and WhatsApp.</span>
                 </label>
                 {errors.consent ? <span className="error-text xs">{errors.consent}</span> : null}
               </div>

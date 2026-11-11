@@ -129,8 +129,8 @@ export function productQuestions(productId, stored = {}) {
     id: `${productId}-q${i}`,
     q,
     a,
-    by: "D2C Mall",
-    answeredBy: i === 0 ? `${p?.brand || "Brand"} (seller)` : "D2C Mall support",
+    by: "D2C World",
+    answeredBy: i === 0 ? `${p?.brand || "Brand"} (seller)` : "D2C World support",
     up,
     at: Date.now() - (i + 3) * 86400000 * 4,
   }));
@@ -146,7 +146,7 @@ export function askQuestion(productId, user, q) {
       ...st,
       questions: {
         ...(st.questions || {}),
-        [productId]: ((st.questions || {})[productId] || []).map((x) => (x.id === item.id ? { ...x, a: "Thanks for asking! Our brand team has noted this and will add full details shortly. Meanwhile, check the specifications above or chat with support.", answeredBy: "D2C Mall support" } : x)),
+        [productId]: ((st.questions || {})[productId] || []).map((x) => (x.id === item.id ? { ...x, a: "Thanks for asking! Our brand team has noted this and will add full details shortly. Meanwhile, check the specifications above or chat with support.", answeredBy: "D2C World support" } : x)),
       },
     }));
     if (user) notify(user.id, { type: "support", title: "Your question was answered", body: q.slice(0, 80), link: `/product/${productId}#qa` });

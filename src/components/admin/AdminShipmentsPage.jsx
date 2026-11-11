@@ -1,5 +1,5 @@
 /*
- * Shipping console — D2C Mall's own Shiprocket-style panel.
+ * Shipping console — D2C World's own Shiprocket-style panel.
  * Orders (New → Ready to ship → Pickup → In transit → Delivered / NDR / RTO),
  * NDR, RTO, COD remittance, manifests, rate calculator, reports, settings.
  * React → /api/shiprocket/* → Shiprocket API (live) · built-in simulator (demo)

@@ -3,13 +3,13 @@
  * updates, OTP). Each channel is used only when its provider is configured.
  */
 export const TEMPLATES = {
-  otp: (d) => `${d.otp} is your D2C Mall login OTP. Valid for 5 minutes. Do not share it with anyone.`,
-  order_confirmed: (d) => `Hi ${d.name}, your D2C Mall order ${d.orderId} is confirmed! Total Rs.${d.total}. Track: ${d.link}`,
+  otp: (d) => `${d.otp} is your D2C World login OTP. Valid for 5 minutes. Do not share it with anyone.`,
+  order_confirmed: (d) => `Hi ${d.name}, your D2C World order ${d.orderId} is confirmed! Total Rs.${d.total}. Track: ${d.link}`,
   cod_advance_received: (d) => `COD advance of Rs.${d.advance} received for order ${d.orderId}. Please pay Rs.${d.balance} in cash or UPI on delivery. The advance is non-refundable if the order is refused at delivery.`,
-  payment_received: (d) => `Payment of Rs.${d.total} received for order ${d.orderId}. Thank you for shopping with D2C Mall.`,
+  payment_received: (d) => `Payment of Rs.${d.total} received for order ${d.orderId}. Thank you for shopping with D2C World.`,
   shipment_created: (d) => `Order ${d.orderId} is packed and ships via ${d.courier} (AWB ${d.awb}). Track: ${d.link}`,
   shipment_update: (d) => `${d.text} Track: ${d.link}`,
-  out_for_delivery: (d) => `Your D2C Mall order ${d.orderId} is out for delivery today. Keep your phone handy!`,
+  out_for_delivery: (d) => `Your D2C World order ${d.orderId} is out for delivery today. Keep your phone handy!`,
   delivered: (d) => `Delivered! Order ${d.orderId} has reached you. Rate your purchase: ${d.link}`,
   delivery_failed: (d) => `We couldn't deliver order ${d.orderId}. The courier will re-attempt tomorrow.`,
   refund_processed: (d) => `Refund of Rs.${d.amount} for ${d.orderId} has been processed to your ${d.method}.`,
@@ -27,7 +27,7 @@ export async function sendNotification({ template, data = {}, email, phone, chan
         const r = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ from: process.env.EMAIL_FROM || "D2C Mall <orders@d2cmall.in>", to: email, subject: `D2C Mall · ${template.replace(/_/g, " ")}`, text }),
+          body: JSON.stringify({ from: process.env.EMAIL_FROM || "D2C World <orders@d2cmall.in>", to: email, subject: `D2C World · ${template.replace(/_/g, " ")}`, text }),
         });
         results.email = r.ok ? "sent" : "failed";
       } else if (channel === "sms") {

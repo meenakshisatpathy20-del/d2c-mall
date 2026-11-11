@@ -73,7 +73,7 @@ export default function SandboxGateway() {
             <div className="gw-brand">
               <img src="/favicon.svg" alt="" width={32} height={32} />
               <div>
-                D2C Mall
+                D2C World
                 <div className="xs" style={{ opacity: 0.7, fontWeight: 600 }}>
                   Order {req.orderId}
                 </div>

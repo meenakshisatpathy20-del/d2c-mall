@@ -10,7 +10,7 @@
 export const franchiseTiers = [
   {
     id: "express",
-    name: "D2C Mall Express",
+    name: "D2C World Express",
     investment: 1100000,
     investmentLabel: "₹11 Lakh",
     tagline: "Compact high-street store for Tier 2 & 3 cities",
@@ -30,7 +30,7 @@ export const franchiseTiers = [
   },
   {
     id: "standard",
-    name: "D2C Mall Store",
+    name: "D2C World Store",
     investment: 2100000,
     investmentLabel: "₹21 Lakh",
     tagline: "Full-format store for Tier 1 & 2 city high streets and malls",
@@ -51,7 +51,7 @@ export const franchiseTiers = [
   },
   {
     id: "flagship",
-    name: "D2C Mall Flagship",
+    name: "D2C World Flagship",
     investment: 5100000,
     investmentLabel: "₹51 Lakh",
     tagline: "Experience-led flagship for metros and premium malls",
@@ -74,11 +74,11 @@ export const franchiseTiers = [
 export const franchiseModels = {
   FOFO: {
     name: "FOFO — Franchise Owned, Franchise Operated",
-    points: ["You invest in and run the store", "Higher margin, full operational control", "D2C Mall supplies stock, tech, branding & training", "Royalty on net sales"],
+    points: ["You invest in and run the store", "Higher margin, full operational control", "D2C World supplies stock, tech, branding & training", "Royalty on net sales"],
   },
   FOCO: {
     name: "FOCO — Franchise Owned, Company Operated",
-    points: ["You invest in the store; D2C Mall runs daily operations", "Passive income with assured minimum return", "Our staff, processes and inventory planning", "Revenue share model"],
+    points: ["You invest in the store; D2C World runs daily operations", "Passive income with assured minimum return", "Our staff, processes and inventory planning", "Revenue share model"],
   },
 };
 
@@ -110,7 +110,7 @@ export const franchiseFaq = [
   ["What is included in the investment?", "Franchise fee, store interiors & branding, fixtures, POS hardware & software, initial marketing and training. Stock is supplied on a consignment/credit model."],
   ["How is inventory managed?", "Stores connect to our warehouse network (Bhiwandi, Delhi NCR, Jaipur, Bengaluru). Auto-replenishment uses real sales data, and slow movers can be returned."],
   ["How long does it take to open?", "Typically 45–75 days from approval: agreement, site fit-out, stock and staff training."],
-  ["What's the difference between FOFO and FOCO?", "FOFO: you own and operate the store. FOCO: you own it, and D2C Mall operates it for a revenue share."],
+  ["What's the difference between FOFO and FOCO?", "FOFO: you own and operate the store. FOCO: you own it, and D2C World operates it for a revenue share."],
 ];
 
 /* Sample applications so the admin review pipeline has data on first run. */

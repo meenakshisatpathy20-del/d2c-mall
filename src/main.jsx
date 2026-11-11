@@ -13,7 +13,7 @@ class RootBoundary extends Component {
     return { error };
   }
   componentDidCatch(error, info) {
-    console.error("[D2C Mall] Unhandled UI error", error, info?.componentStack);
+    console.error("[D2C World] Unhandled UI error", error, info?.componentStack);
   }
   render() {
     if (!this.state.error) return this.props.children;

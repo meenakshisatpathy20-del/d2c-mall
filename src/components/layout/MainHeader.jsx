@@ -315,7 +315,7 @@ function AccountMenu({ user }) {
               </div>
             ) : (
               <div className="hacc-head col" style={{ alignItems: "stretch" }}>
-                <b>Welcome to D2C Mall</b>
+                <b>Welcome to D2C World</b>
                 <span className="xs muted">Access your orders, wishlist & D2C Street</span>
                 <Link to="/login" className="btn btn-sm btn-block mt-8" onClick={() => setOpen(false)}>
                   Login / Sign up
@@ -456,14 +456,14 @@ export default function MainHeader() {
             <Menu size={22} />
           </button>
 
-          <Link to="/" className="logo" aria-label="D2C Mall home">
+          <Link to="/" className="logo" aria-label="D2C World home">
             <span className="logo-tile">
               <Store size={22} />
             </span>
             <span className="logo-text">
               <span className="logo-word">
                 <span className="d2c">D2C</span>
-                <span className="mall">MALL</span>
+                <span className="mall">WORLD</span>
               </span>
               <span className="logo-tag">Direct-to-consumer store</span>
             </span>

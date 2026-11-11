@@ -1,6 +1,6 @@
 /*
  * Public order tracking — no login needed (like a Shiprocket tracking page,
- * in D2C Mall's own design). Search by order ID + phone, or by AWB.
+ * in D2C World's own design). Search by order ID + phone, or by AWB.
  * Customers can also fix a failed delivery themselves (reschedule, update
  * address/phone, or cancel) and rate the delivery.
  * Live mode: /api/shiprocket/track-order + /api/shiprocket/ndr-response.

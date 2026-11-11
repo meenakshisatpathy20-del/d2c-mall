@@ -83,7 +83,7 @@ export default function LoginPage() {
             <span className="logo-text">
               <span className="logo-word">
                 <span className="d2c" style={{ color: "#8fb0ff" }}>D2C</span>
-                <span className="mall">MALL</span>
+                <span className="mall">WORLD</span>
               </span>
             </span>
           </Link>
@@ -115,7 +115,7 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <h2 className="mt-24">{mode === "login" ? "Welcome back 👋" : "Join D2C Mall"}</h2>
+          <h2 className="mt-24">{mode === "login" ? "Welcome back 👋" : "Join D2C World"}</h2>
           <p className="small muted mt-4">{mode === "login" ? "Login to continue shopping." : "It takes less than a minute."}</p>
 
           {mode === "login" ? (
