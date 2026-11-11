@@ -44,7 +44,7 @@ export function ShippingLabel({ order, shipment }) {
         <div>
           <b className="sr-label-brand">
             <span style={{ color: "#2457ff" }}>D2C</span>
-            <span style={{ color: "#ff6b00" }}>MALL</span>
+            <span style={{ color: "#ff6b00" }}>WORLD</span>
           </b>
           <span className="xs">Shipping label</span>
         </div>
@@ -90,7 +90,7 @@ export function ShippingLabel({ order, shipment }) {
       </div>
       <div className="sr-label-row">
         <span className="xs muted">RETURN ADDRESS (if undelivered)</span>
-        <span className="xs">D2C Mall · {wh.name}, {wh.city} – {wh.pincode} · {wh.phone}</span>
+        <span className="xs">D2C World · {wh.name}, {wh.city} – {wh.pincode} · {wh.phone}</span>
       </div>
     </div>
   );

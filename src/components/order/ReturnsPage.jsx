@@ -164,7 +164,7 @@ function NewReturn({ user, orders, onDone }) {
           <div className="col gap-10 mt-12">
             {[
               ["original", CreditCard, "Original payment method", order?.payment.method === "cod" ? "Not available for COD orders" : `${order?.payment.instrument} · 3–5 working days`, order?.payment.method === "cod"],
-              ["credits", Wallet, "D2C Mall credits", "Instant after pickup · use on your next order", false],
+              ["credits", Wallet, "D2C World credits", "Instant after pickup · use on your next order", false],
               ["bank", Banknote, "Bank account (NEFT/IMPS)", "Add account details · 2–3 working days", false],
             ].map(([id, Icon, t, s, disabled]) => (
               <label key={id} className={cx("radio-card", refund === id && "active", disabled && "disabled-card")}>

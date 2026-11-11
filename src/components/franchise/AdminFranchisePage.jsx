@@ -73,7 +73,7 @@ function Detail({ app, admin, onClose }) {
           </div>
         </div>
         <div className="soft-panel xs">
-          <b className="small">Why D2C Mall</b>
+          <b className="small">Why D2C World</b>
           <p className="mt-4">{app.why}</p>
         </div>
 

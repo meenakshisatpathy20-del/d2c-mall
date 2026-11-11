@@ -111,7 +111,7 @@ function PersonalSection() {
         <SectionHead
           eyebrow={<><Sparkles size={13} /> Picked for you</>}
           eyebrowTone="blue"
-          title={recentlyViewed.length || wishlist.length ? "Recommended based on your taste" : "Top rated across D2C Mall"}
+          title={recentlyViewed.length || wishlist.length ? "Recommended based on your taste" : "Top rated across D2C World"}
           sub="Updated as you browse, save and shop"
           to="/shop?sort=rating"
           action="See more"
@@ -286,7 +286,7 @@ function FranchiseBanner() {
         <span className="eyebrow light">
           <Store size={13} /> Franchise opportunities
         </span>
-        <h2>Own a D2C Mall store in your city.</h2>
+        <h2>Own a D2C World store in your city.</h2>
         <p>FOFO and FOCO models · curated D2C assortment · tech-enabled inventory from our warehouse network.</p>
       </div>
       <div className="row gap-16 wrap">

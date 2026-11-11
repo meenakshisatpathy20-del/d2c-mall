@@ -108,7 +108,7 @@ export async function openCheckout({ gatewayOrder, amount, method, user, address
         amount: gatewayOrder.amount,
         currency: "INR",
         order_id: gatewayOrder.id,
-        name: "D2C Mall",
+        name: "D2C World",
         description: description || `Order ${orderId}`,
         image: "/favicon.svg",
         prefill: { name: user?.name, email: user?.email, contact: address?.phone || user?.phone, ...(prefillMethod ? { method: prefillMethod } : {}) },

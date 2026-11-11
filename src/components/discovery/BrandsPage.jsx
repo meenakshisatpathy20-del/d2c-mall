@@ -96,7 +96,7 @@ export default function BrandsPage() {
                 <Store size={13} /> Brand directory
               </span>
               <h1>Meet the makers.</h1>
-              <p>Every brand on D2C Mall is verified, founder-led and ships directly through our fulfilment network.</p>
+              <p>Every brand on D2C World is verified, founder-led and ships directly through our fulfilment network.</p>
               <div className="brand-search">
                 <Search size={17} />
                 <input placeholder="Search brands" value={q} onChange={(e) => setQ(e.target.value)} />

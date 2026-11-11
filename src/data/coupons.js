@@ -11,7 +11,7 @@ export const coupons = [
   {
     code: "WELCOME100",
     title: "Flat ₹100 off your first order",
-    description: "New to D2C Mall? Enjoy ₹100 off on orders above ₹499.",
+    description: "New to D2C World? Enjoy ₹100 off on orders above ₹499.",
     type: "flat",
     value: 100,
     minCart: 499,

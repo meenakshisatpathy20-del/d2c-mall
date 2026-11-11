@@ -1,5 +1,5 @@
 /*
- * D2C Mall catalogue.
+ * D2C World catalogue.
  * This is the single source of product truth for the frontend. When the
  * backend is live, `src/lib/api.js` swaps these reads for API calls with the
  * same shapes.

@@ -555,7 +555,7 @@ export default function CheckoutPage() {
                           : `Pay ${formatINR(summary.total)} securely`}
                   </button>
                   <p className="xs muted center mt-8">
-                    By placing this order you agree to D2C Mall's terms. Payments are processed by Razorpay and verified on our server.
+                    By placing this order you agree to D2C World's terms. Payments are processed by Razorpay and verified on our server.
                   </p>
                 </div>
               ) : null}

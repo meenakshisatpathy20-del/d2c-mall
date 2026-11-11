@@ -198,9 +198,9 @@ export function InvoiceModal({ order, open, onClose }) {
           <div>
             <b style={{ fontSize: 20 }}>
               <span className="text-blue">D2C</span>
-              <span className="text-orange">MALL</span>
+              <span className="text-orange">WORLD</span>
             </b>
-            <p className="xs muted">D2C Mall Retail Pvt. Ltd. · GSTIN 29AABCD1234E1Z5 · CIN U52390KA2024PTC000000</p>
+            <p className="xs muted">D2C World Retail Pvt. Ltd. · GSTIN 29AABCD1234E1Z5 · CIN U52390KA2024PTC000000</p>
           </div>
           <div className="right xs">
             <b>Tax Invoice</b>
