@@ -17,7 +17,6 @@ import {
   RefreshCcw,
   ShieldCheck,
   Smartphone,
-  Star,
   Truck,
   Wallet,
   Warehouse,
@@ -79,7 +78,6 @@ export default function CheckoutPage() {
   const [addressId, setAddressId] = useState(() => user?.addresses?.find((a) => a.isDefault)?.id || user?.addresses?.[0]?.id);
   const [editing, setEditing] = useState(null);
   const [speed, setSpeed] = useState("standard");
-  const [courierChoice, setCourierChoice] = useState({});
   const [method, setMethod] = useState("upi");
   const [stage, setStage] = useState(null);
   const [failure, setFailure] = useState(null);
@@ -162,7 +160,6 @@ export default function CheckoutPage() {
       user,
       lines,
       address,
-      courierChoice,
       deliverySpeed: plan?.expressAvailable ? speed : "standard",
       paymentMethod: method,
       couponCode: summary.couponCode,
@@ -370,27 +367,9 @@ export default function CheckoutPage() {
                               return <Img key={it.productId} src={l?.image} alt="" className="plan-thumb" label="" />;
                             })}
                           </div>
-                          <span className="label mt-12" style={{ display: "block" }}>
-                            Courier partner <span className="xs muted">(via Shiprocket)</span>
-                          </span>
-                          <div className="courier-list">
-                            {s.couriers.slice(0, 4).map((c) => {
-                              const chosen = (courierChoice[s.warehouseId] || s.courierId) === c.id;
-                              return (
-                                <label key={c.id} className={cx("courier", chosen && "active")}>
-                                  <input type="radio" checked={chosen} onChange={() => setCourierChoice({ ...courierChoice, [s.warehouseId]: c.id })} />
-                                  <div className="grow">
-                                    <b className="small">{c.name}</b>
-                                    {c.id === s.courierId ? <span className="badge badge-soft-green" style={{ marginLeft: 6 }}>Recommended</span> : null}
-                                    <div className="xs muted row gap-6">
-                                      <Star size={11} fill="#f5a524" color="#f5a524" /> {c.rating} · {c.days} day{c.days > 1 ? "s" : ""} · {c.cod ? "COD" : "Prepaid"}
-                                    </div>
-                                  </div>
-                                  <span className="xs faint">{dayLabel(Date.now() + c.days * 86400000)}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
+                          <p className="xs muted mt-12 row gap-6">
+                            <Truck size={13} /> Shipped by our courier partners via Shiprocket · arrives {dayLabel(speed === "express" && plan.expressAvailable ? plan.expressEta : plan.eta)}
+                          </p>
                         </div>
                       ))}
                       <button className="btn btn-lg mt-16" onClick={() => setStep(3)}>
