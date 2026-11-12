@@ -7,6 +7,7 @@ import { warehouses } from "./logistics";
 import { hashPassword } from "../lib/crypto";
 import { buildShipment, newInvoiceNo } from "../lib/orderModel";
 import { computeSummary } from "../lib/pricing";
+import { codAdvanceFor } from "./codAdvance";
 import { seedFranchiseApps } from "./franchise";
 import { NDR_REASONS, defaultPackage, newAwbFor, pickByRule, pickupPlan, quoteForShipment, rtoPlan } from "../lib/shippingModel";
 
@@ -76,6 +77,47 @@ function address(name, phone, city, pincode, state, type = "Home") {
   };
 }
 
+/*
+ * COD orders carry a partial advance (₹49 / ₹99) paid online at checkout, so
+ * the demo data shows it everywhere (admin Orders KPIs, badges, order drawer).
+ * Also used to upgrade demo data saved before the advance existed.
+ */
+export function withDemoCodAdvance(order) {
+  if (order?.payment?.method !== "cod" || order.payment.advance) return order;
+  const p = order.pricing || {};
+  const amount = p.codAdvance || codAdvanceFor(p.total);
+  if (!amount) return order;
+  const balance = (p.total || 0) - amount;
+  const paidAt = order.createdAt + 60000;
+  const cancelled = order.status === "cancelled";
+  const advance = {
+    amount,
+    balance,
+    status: cancelled ? "refunded" : "paid",
+    paidAt,
+    instrument: "UPI",
+    razorpayPaymentId: `pay_${order.id.slice(-8)}Ad`,
+    ...(cancelled ? { refundedAt: order.createdAt + 3 * HOUR } : {}),
+  };
+  const timeline = [...(order.timeline || [])];
+  const placed = timeline.findIndex((t) => t.status === "placed");
+  timeline.splice(placed + 1, 0, { status: "paid", at: paidAt, note: `COD advance of ₹${amount} paid & Razorpay signature verified · ₹${balance.toLocaleString("en-IN")} to be collected on delivery` });
+  return {
+    ...order,
+    pricing: { ...p, codAdvance: amount, codBalance: balance, payNow: amount },
+    codAdvanceConsent: order.codAdvanceConsent || { at: order.createdAt, amount },
+    payment: {
+      ...order.payment,
+      status: cancelled ? "refund_initiated" : order.payment.status === "cod_pending" ? "advance_paid" : order.payment.status,
+      gateway: "razorpay",
+      signatureVerified: true,
+      advance,
+      attempts: [...(order.payment.attempts || []), { at: paidAt, status: "advance_paid" }],
+    },
+    timeline,
+  };
+}
+
 function makeOrder({ id, userId, customer, addr, lines, createdAt, method = "upi", stepMs = 14 * HOUR, stopAt = null, failAt = false, cancelled = false, returnState = null, split = false }) {
   const items = lines.map(([pid, qty, size, color], i) => {
     const p = productMap[pid];
@@ -95,7 +137,7 @@ function makeOrder({ id, userId, customer, addr, lines, createdAt, method = "upi
       returnDays: p.returnDays,
     };
   });
-  const summary = computeSummary({ items, paymentMethod: method });
+  const summary = computeSummary({ items, paymentMethod: method, codAdvance: method === "cod" });
   const whA = warehouses.find((w) => w.city.includes(addr.state)) || warehouses[1];
   const whB = warehouses.find((w) => w.id !== whA.id);
   const groups = split && items.length > 1 ? [[whA, items.slice(0, 1)], [whB, items.slice(1)]] : [[whA, items]];
@@ -116,7 +158,7 @@ function makeOrder({ id, userId, customer, addr, lines, createdAt, method = "upi
         })
       );
   const paid = method !== "cod";
-  return {
+  return withDemoCodAdvance({
     id,
     userId,
     customer,
@@ -146,7 +188,7 @@ function makeOrder({ id, userId, customer, addr, lines, createdAt, method = "upi
     ],
     invoiceNo: newInvoiceNo(id),
     idempotencyKey: `idem_${id}`,
-  };
+  });
 }
 
 
@@ -291,6 +333,7 @@ export function createSeedState() {
 
   return {
     version: 4,
+    codAdvanceSeeded: true,
     session: null,
     adminSession: null,
     pincode: null,

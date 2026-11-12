@@ -6,7 +6,7 @@
  * the services — components never talk to localStorage directly.
  */
 import { useSyncExternalStore } from "react";
-import { createSeedState } from "../data/seed";
+import { createSeedState, withDemoCodAdvance } from "../data/seed";
 
 const KEY = "d2c_mall_state_v4";
 const listeners = new Set();
@@ -16,7 +16,12 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.version === 4) return parsed;
+      if (parsed && parsed.version === 4) {
+        // Demo data saved before COD partial advance existed: attach a paid advance to COD orders.
+        if (!parsed.codAdvanceSeeded) parsed.orders = (parsed.orders || []).map(withDemoCodAdvance);
+        parsed.codAdvanceSeeded = true;
+        return parsed;
+      }
     }
   } catch {
     /* corrupted storage — reseed */
