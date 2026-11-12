@@ -19,3 +19,29 @@
 .ship-card details summary {
   cursor: pointer;
 }
+
+.adv-kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .adv-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.adv-panel {
+  border-left: 3px solid var(--blue);
+}
+
+.adv-split {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.adv-split > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

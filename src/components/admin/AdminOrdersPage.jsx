@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, live, useBackend } from "../../lib/api";
 import { Link, useSearchParams } from "react-router-dom";
-import { Download, Search, Truck, X, XCircle } from "lucide-react";
+import { Ban, Download, HandCoins, RotateCcw, Search, Truck, Wallet, X, XCircle } from "lucide-react";
+import { COD_ADVANCE_FORFEIT_TEXT, advanceView, codAdvanceTierText, codDue, hasCodAdvance } from "../../data/codAdvance";
 import { useStore } from "../../lib/store";
 import { getCourier, getWarehouse, warehouses } from "../../data/logistics";
 import { ORDER_STATUS, SHIPMENT_LABEL, deriveOrderStatus, shipmentStatus } from "../../lib/orderModel";
@@ -11,7 +12,7 @@ import { cx, formatDateTime, formatINR } from "../../lib/format";
 import { toast } from "../../lib/toast";
 import { Drawer, Img, StatusPill } from "../common/ui";
 import { ShipmentEvents, ShipmentProgress } from "../order/OrderBits";
-import { AdminHeader, exportCsv } from "./AdminBits";
+import { AdminHeader, Kpi, exportCsv } from "./AdminBits";
 import { scopeOrders } from "./AdminDashboard";
 import "./AdminOrdersPage.css";
 
@@ -25,6 +26,51 @@ export function ShipmentOps({ shipment, admin }) {
       <Link to="/admin/shipments" className="btn btn-xs btn-soft">
         <Truck size={12} /> {hint ? `${hint} in Shipping` : "Open in Shipping"} →
       </Link>
+    </div>
+  );
+}
+
+const ADVANCE_TONE = { pending: "amber", paid: "blue", adjusted: "green", refunded: "gray", forfeited: "red" };
+const BALANCE_LABEL = { due: "To collect at door", collected: "Collected", not_due: "Not due" };
+
+/** Badge for the COD advance state on an order. */
+export function AdvanceBadge({ view }) {
+  if (!view) return null;
+  return <span className={`badge badge-soft-${ADVANCE_TONE[view.status] || "gray"}`}>Advance · {view.label}</span>;
+}
+
+/** COD partial advance breakdown shown to operations in the order drawer. */
+function AdvancePanel({ order, status }) {
+  const view = advanceView(order, status);
+  if (!view) return null;
+  return (
+    <div className="soft-panel adv-panel">
+      <div className="row between wrap gap-6">
+        <span className="label">COD partial advance</span>
+        <AdvanceBadge view={view} />
+      </div>
+      <div className="adv-split mt-8">
+        <div>
+          <span className="xs muted">Order total</span>
+          <b>{formatINR(order.pricing.total)}</b>
+        </div>
+        <div>
+          <span className="xs muted">Advance (online)</span>
+          <b>{formatINR(view.amount)}</b>
+        </div>
+        <div>
+          <span className="xs muted">Balance (COD)</span>
+          <b>{formatINR(view.balance ?? codDue(order))}</b>
+          <span className="xs muted">{BALANCE_LABEL[view.balanceStatus]}</span>
+        </div>
+      </div>
+      <div className="xs muted mt-8">
+        {view.paidAt ? <>Paid {formatDateTime(view.paidAt)} via {view.instrument || "Online"}{view.razorpayPaymentId ? ` · ${view.razorpayPaymentId}` : ""}. </> : <>Advance not yet received — order will not ship until it is paid. </>}
+        {order.codAdvanceConsent ? <>Customer accepted advance terms on {formatDateTime(order.codAdvanceConsent.at)}.</> : null}
+      </div>
+      {view.status === "forfeited" ? <div className="notice warn xs mt-8">Customer refused delivery — advance retained to cover two-way shipping.</div> : null}
+      {view.status === "refunded" ? <div className="notice info xs mt-8">Advance refunded to the original payment method.</div> : null}
+      <div className="xs muted mt-8">Policy: {codAdvanceTierText()}. {COD_ADVANCE_FORFEIT_TEXT}</div>
     </div>
   );
 }
@@ -59,6 +105,8 @@ function OrderDrawer({ order, onClose, admin, now }) {
             {order.payment.razorpayPaymentId ? <div className="xs muted">{order.payment.razorpayPaymentId} {order.payment.signatureVerified ? "· ✓ signature" : ""}</div> : null}
           </div>
         </div>
+
+        <AdvancePanel order={order} status={status} />
 
         <div>
           <span className="label">Items</span>
@@ -147,13 +195,31 @@ export default function AdminOrdersPage({ admin }) {
     const t = q.trim().toLowerCase();
     return orders.filter((o) => {
       if (status !== "all" && o.live !== status) return false;
-      if (pay !== "all" && (pay === "cod" ? o.payment.method !== "cod" : o.payment.method === "cod")) return false;
+      if (pay === "cod_advance" && !hasCodAdvance(o)) return false;
+      if (pay === "cod" && o.payment.method !== "cod") return false;
+      if (pay === "prepaid" && o.payment.method === "cod") return false;
       if (wh !== "all" && !o.shipments.some((s) => s.warehouseId === wh)) return false;
       if (!t) return true;
       return o.id.toLowerCase().includes(t) || o.customer.toLowerCase().includes(t) || o.address.phone.includes(t) || o.items.some((i) => i.sku.toLowerCase().includes(t));
     });
   }, [orders, q, status, pay, wh]);
   const open = orders.find((o) => o.id === openId);
+
+  // COD partial-advance summary across the orders this admin can see.
+  const adv = useMemo(() => {
+    const r = { count: 0, collected: 0, pending: 0, balanceDue: 0, forfeited: 0, forfeitedCount: 0, refunded: 0 };
+    for (const o of orders) {
+      const v = advanceView(o, o.live);
+      if (!v) continue;
+      r.count += 1;
+      if (["paid", "adjusted"].includes(v.status)) r.collected += v.amount;
+      if (v.status === "pending") r.pending += 1;
+      if (v.status === "forfeited") { r.forfeited += v.amount; r.forfeitedCount += 1; }
+      if (v.status === "refunded") r.refunded += v.amount;
+      if (v.balanceStatus === "due" && v.status !== "pending") r.balanceDue += v.balance ?? codDue(o);
+    }
+    return r;
+  }, [orders]);
 
   return (
     <div className="col gap-16">
@@ -167,7 +233,7 @@ export default function AdminOrdersPage({ admin }) {
             onClick={() =>
               exportCsv(
                 "orders.csv",
-                list.map((o) => ({ order: o.id, date: new Date(o.createdAt).toISOString(), customer: o.customer, city: o.address.city, items: o.items.length, total: o.pricing.total, payment: o.payment.method, paymentStatus: o.payment.status, status: o.live }))
+                list.map((o) => ({ order: o.id, date: new Date(o.createdAt).toISOString(), customer: o.customer, city: o.address.city, items: o.items.length, total: o.pricing.total, payment: o.payment.method, paymentStatus: o.payment.status, codAdvance: o.pricing.codAdvance || 0, advanceStatus: advanceView(o, o.live)?.status || "", codBalance: codDue(o), status: o.live }))
               )
             }
           >
@@ -175,6 +241,14 @@ export default function AdminOrdersPage({ admin }) {
           </button>
         }
       />
+      {adv.count ? (
+        <div className="adm-kpis adv-kpis">
+          <Kpi icon={Wallet} label="COD advances collected" value={formatINR(adv.collected)} delta={`${adv.count} advance orders${adv.pending ? ` · ${adv.pending} awaiting payment` : ""}`} tone="blue" />
+          <Kpi icon={HandCoins} label="Balance to collect at door" value={formatINR(adv.balanceDue)} delta="Open COD advance orders" tone="orange" />
+          <Kpi icon={Ban} label="Advance forfeited" value={formatINR(adv.forfeited)} delta={`${adv.forfeitedCount} refused / RTO`} tone="purple" />
+          <Kpi icon={RotateCcw} label="Advance refunded" value={formatINR(adv.refunded)} delta="Cancelled or returned" tone="green" />
+        </div>
+      ) : null}
       <div className="adm-toolbar">
         <div className="input-group" style={{ flex: 1, minWidth: 220 }}>
           <span className="addon"><Search size={15} /></span>
@@ -190,6 +264,7 @@ export default function AdminOrdersPage({ admin }) {
           <option value="all">All payments</option>
           <option value="prepaid">Prepaid</option>
           <option value="cod">COD</option>
+          <option value="cod_advance">COD with advance</option>
         </select>
         <select className="select" style={{ width: "auto" }} value={wh} onChange={(e) => setWh(e.target.value)} disabled={!!admin.warehouseId}>
           <option value="all">All warehouses</option>
@@ -227,6 +302,12 @@ export default function AdminOrdersPage({ admin }) {
                 <td className="xs">
                   <b>{o.payment.method.toUpperCase()}</b>
                   <div className="muted" style={{ textTransform: "capitalize" }}>{o.payment.status.replace(/_/g, " ")}</div>
+                  {hasCodAdvance(o) ? (
+                    <div className="mt-4">
+                      <AdvanceBadge view={advanceView(o, o.live)} />
+                      <div className="muted">{formatINR(o.pricing.codAdvance)} adv · {formatINR(codDue(o))} at door</div>
+                    </div>
+                  ) : null}
                 </td>
                 <td className="xs">
                   {o.shipments.map((s) => (
